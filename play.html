@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>Buzzer</title><link rel="stylesheet" href="style.css"></head><body>
+<main class="wrap center">
+ <h1>Buzzer</h1>
+ <div id="pick" class="card pick" hidden></div>
+ <div id="game" hidden>
+  <p id="who" class="status"></p>
+  <button id="buzz" class="buzz">BUZZ</button>
+  <p id="msg" class="status"></p>
+  <button id="switch" class="bad">Not you?</button>
+ </div>
+</main>
+<script type="module">
+import { db, ref, onValue, runTransaction, room, esc } from "./common.js";
+const $ = id => document.getElementById(id);
+const key = "pid-" + room;
+let players = {}, buzz = {};
+onValue(ref(db, `rooms/${room}/players`), s => { players = s.val() || {}; render(); });
+onValue(ref(db, `rooms/${room}/buzz`), s => { buzz = s.val() || {}; render(); });
+
+function render() {
+  const me = localStorage.getItem(key);
+  const mine = players[me];
+  $("pick").hidden = !!mine; $("game").hidden = !mine;
+  if (!mine) {
+    $("pick").innerHTML = "<h2>Who are you?</h2>" + (Object.keys(players).length
+      ? Object.entries(players).sort((a, b) => a[1].num - b[1].num).map(([id, p]) => `<button data-id="${id}">#${p.num} ${esc(p.name)}</button>`).join("")
+      : "<p>Waiting for the host to add players…</p>");
+    return;
+  }
+  const out = buzz.out && buzz.out[me];
+  const can = buzz.open && !buzz.winner && !out;
+  $("who").textContent = `${mine.name} · ${mine.score} pts`;
+  $("buzz").disabled = !can;
+  $("msg").textContent = buzz.winner ? (buzz.winner === me ? "You buzzed first! 🎉" : `${players[buzz.winner]?.name || "Someone"} buzzed first`)
+    : out ? "You're locked out this question" : buzz.open ? "GO!" : "Wait for the host…";
+}
+$("pick").onclick = e => { const id = e.target.dataset.id; if (id) { localStorage.setItem(key, id); render(); } };
+$("switch").onclick = () => { localStorage.removeItem(key); render(); };
+$("buzz").onclick = () => {
+  const me = localStorage.getItem(key);
+  navigator.vibrate?.(60);
+  runTransaction(ref(db, `rooms/${room}/buzz`), cur => {
+    if (cur && cur.open && !cur.winner && !(cur.out && cur.out[me])) { cur.winner = me; cur.open = false; return cur; }
+  });
+};
+</script></body></html>

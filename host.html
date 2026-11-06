@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jeopardy Host</title><link rel="stylesheet" href="style.css"></head><body>
+<main class="wrap">
+<h1>Jeopardy · Host Panel</h1>
+<section class="grid">
+ <div class="card center"><h2>Players scan to join</h2><div id="qr"></div><p id="link" class="small"></p></div>
+ <div class="card"><h2>Buzzer</h2><div id="status" class="status">Locked</div>
+  <label>Points <input id="val" type="number" value="200" step="100" style="width:110px"></label>
+  <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="skip">Skip</button></div>
+ </div>
+</section>
+<section class="card"><h2>Players</h2>
+ <div class="row"><input id="name" placeholder="Player name"><button id="add">Add player</button></div>
+ <div id="players"></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+import { db, ref, set, push, remove, onValue, runTransaction, room, esc } from "./common.js";
+const $ = id => document.getElementById(id);
+const P = ref(db, `rooms/${room}/players`), B = ref(db, `rooms/${room}/buzz`);
+let players = {}, buzz = {};
+
+const joinUrl = new URL("play.html?room=" + room, location.href).href;
+new QRCode($("qr"), { text: joinUrl, width: 180, height: 180 });
+$("link").textContent = joinUrl;
+
+onValue(P, s => { players = s.val() || {}; render(); });
+onValue(B, s => { buzz = s.val() || {}; render(); });
+
+function render() {
+  const w = buzz.winner && players[buzz.winner];
+  $("status").textContent = w ? `${w.name} buzzed first!` : buzz.open ? "Buzzers open…" : "Locked";
+  $("players").innerHTML = Object.entries(players).sort((a, b) => a[1].num - b[1].num).map(([id, p]) =>
+    `<div class="p ${id === buzz.winner ? "win" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span>
+     <button data-a="-" data-id="${id}">−</button><button data-a="+" data-id="${id}">+</button><button data-a="x" data-id="${id}" class="bad">✕</button></div>`).join("");
+}
+
+const val = () => Number($("val").value) || 0;
+const adjust = (id, d) => runTransaction(ref(db, `rooms/${room}/players/${id}/score`), v => (v || 0) + d);
+
+$("add").onclick = () => {
+  const name = $("name").value.trim(); if (!name) return;
+  const num = Math.max(0, ...Object.values(players).map(p => p.num)) + 1;
+  push(P, { name, num, score: 0 }); $("name").value = "";
+};
+$("name").onkeydown = e => { if (e.key === "Enter") $("add").click(); };
+$("players").onclick = e => {
+  const { a, id } = e.target.dataset; if (!a) return;
+  if (a === "x") { if (confirm(`Remove ${players[id].name}?`)) remove(ref(db, `rooms/${room}/players/${id}`)); }
+  else adjust(id, a === "+" ? val() : -val());
+};
+$("open").onclick = () => set(B, { open: true });
+$("skip").onclick = () => set(B, { open: false });
+$("ok").onclick = () => { if (buzz.winner) { adjust(buzz.winner, val()); set(B, { open: false }); } };
+$("bad").onclick = () => {
+  if (!buzz.winner) return;
+  adjust(buzz.winner, -val());
+  set(B, { open: true, out: { ...(buzz.out || {}), [buzz.winner]: true } });
+};
+</script></body></html>
