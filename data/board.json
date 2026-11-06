@@ -1,22 +1,94 @@
 {
   "categories": [
-    { "name": "Science", "clues": [
-      { "value": 200, "question": "This planet is known as the Red Planet.", "answer": "Mars" },
-      { "value": 400, "question": "H2O is the chemical formula for this.", "answer": "Water" },
-      { "value": 600, "question": "This force keeps us on the ground.", "answer": "Gravity" },
-      { "value": 800, "question": "The powerhouse of the cell.", "answer": "Mitochondria" },
-      { "value": 1000, "question": "This element has the atomic number 1.", "answer": "Hydrogen" } ] },
-    { "name": "Geography", "clues": [
-      { "value": 200, "question": "The capital of France.", "answer": "Paris" },
-      { "value": 400, "question": "The longest river in Africa.", "answer": "The Nile" },
-      { "value": 600, "question": "The largest ocean on Earth.", "answer": "The Pacific" },
-      { "value": 800, "question": "The capital of Jordan.", "answer": "Amman" },
-      { "value": 1000, "question": "The smallest country in the world by area.", "answer": "Vatican City" } ] },
-    { "name": "Movies", "clues": [
-      { "value": 200, "question": "The toy cowboy in Toy Story.", "answer": "Woody" },
-      { "value": 400, "question": "He directed Jaws and E.T.", "answer": "Steven Spielberg" },
-      { "value": 600, "question": "The fictional African kingdom in Black Panther.", "answer": "Wakanda" },
-      { "value": 800, "question": "The first film in the Lord of the Rings trilogy.", "answer": "The Fellowship of the Ring" },
-      { "value": 1000, "question": "The 1997 film where Jack and Rose meet on a ship.", "answer": "Titanic" } ] }
+    {
+      "name": "Science",
+      "clues": [
+        {
+          "value": 200,
+          "question": "This planet is known as the Red Planet.",
+          "answer": "Mars"
+        },
+        {
+          "value": 400,
+          "question": "H2O is the chemical formula for this.",
+          "answer": "Water"
+        },
+        {
+          "value": 600,
+          "question": "This force keeps us on the ground.",
+          "answer": "Gravity"
+        },
+        {
+          "value": 800,
+          "question": "The powerhouse of the cell.",
+          "answer": "Mitochondria"
+        },
+        {
+          "value": 1000,
+          "question": "This element has the atomic number 1.",
+          "answer": "Hydrogen"
+        }
+      ]
+    },
+    {
+      "name": "Geography",
+      "clues": [
+        {
+          "value": 200,
+          "question": "The capital of France.",
+          "answer": "Paris"
+        },
+        {
+          "value": 400,
+          "question": "The longest river in Africa.",
+          "answer": "The Nile"
+        },
+        {
+          "value": 600,
+          "question": "The largest ocean on Earth.",
+          "answer": "The Pacific"
+        },
+        {
+          "value": 800,
+          "question": "The capital of Jordan.",
+          "answer": "Amman"
+        },
+        {
+          "value": 1000,
+          "question": "The smallest country in the world by area.",
+          "answer": "Vatican City"
+        }
+      ]
+    },
+    {
+      "name": "Movies2",
+      "clues": [
+        {
+          "value": 200,
+          "question": "The toy cowboy in Toy Story.",
+          "answer": "Woody"
+        },
+        {
+          "value": 400,
+          "question": "He directed Jaws and E.T.",
+          "answer": "Steven Spielberg"
+        },
+        {
+          "value": 600,
+          "question": "The fictional African kingdom in Black Panther.",
+          "answer": "Wakanda"
+        },
+        {
+          "value": 800,
+          "question": "The first film in the Lord of the Rings trilogy.",
+          "answer": "The Fellowship of the Ring"
+        },
+        {
+          "value": 1000,
+          "question": "The 1997 film where Jack and Rose meet on a ship.",
+          "answer": "Titanic"
+        }
+      ]
+    }
   ]
 }
