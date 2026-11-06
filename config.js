@@ -5,7 +5,7 @@ export const firebaseConfig = {
   authDomain:"faisalgameshow.firebaseapp.com",
   databaseURL: "https://faisalgameshow-default-rtdb.europe-west1.firebasedatabase.app/",
   projectId: "faisalgameshow",
-  appId: "1:1098864026693:web:964bec8451fb3945a4ef2c"
+  appId: "1:1098864026693:web:964bec8451fb3945a4ef2c",
   storageBucket: "faisalgameshow.firebasestorage.app",
   messagingSenderId: "1098864026693",
 };
