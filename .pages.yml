@@ -1,0 +1,23 @@
+content:
+  - name: board
+    label: Jeopardy Board
+    type: file
+    path: data/board.json
+    format: json
+    fields:
+      - name: categories
+        label: Categories
+        type: object
+        list: true
+        fields:
+          - name: name
+            label: Category name
+            type: string
+          - name: clues
+            label: Clues
+            type: object
+            list: true
+            fields:
+              - { name: value, label: Points, type: number }
+              - { name: question, label: Clue shown to players, type: text }
+              - { name: answer, label: Answer (host only), type: string }

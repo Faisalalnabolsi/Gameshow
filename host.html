@@ -3,13 +3,17 @@
 <h1>Jeopardy · Host Panel</h1>
 <section class="grid">
  <div class="card center"><h2>Players scan to join</h2><div id="qr"></div><p id="link" class="small"></p></div>
- <div class="card"><h2>Buzzer</h2><div id="status" class="status">Locked</div>
-  <label>Points <input id="val" type="number" value="200" step="100" style="width:110px"></label>
-  <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="skip">Skip</button></div>
+ <div class="card"><h2>Current clue</h2>
+  <div id="clue" class="clue"></div>
+  <div id="ans" class="small"></div>
+  <div id="status" class="status">Locked</div>
+  <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="skip">Skip</button><button id="cancel" class="bad">Cancel</button></div>
+  <label class="small">Manual points (player +/−) <input id="val" type="number" value="200" step="100" style="width:100px"></label>
  </div>
 </section>
+<section class="card"><h2>Board</h2><div id="board" class="board"></div></section>
 <section class="card"><h2>Players</h2>
- <div class="row"><input id="name" placeholder="Player name"><button id="add">Add player</button></div>
+ <div class="row"><input id="name" placeholder="Player name"><button id="add">Add player</button><button id="reset" class="bad">New game</button></div>
  <div id="players"></div>
 </section>
 </main>
@@ -17,44 +21,78 @@
 <script type="module">
 import { db, ref, set, push, remove, onValue, runTransaction, room, esc } from "./common.js";
 const $ = id => document.getElementById(id);
-const P = ref(db, `rooms/${room}/players`), B = ref(db, `rooms/${room}/buzz`);
-let players = {}, buzz = {};
+const R = p => ref(db, `rooms/${room}/${p}`);
+let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false;
 
 const joinUrl = new URL("play.html?room=" + room, location.href).href;
 new QRCode($("qr"), { text: joinUrl, width: 180, height: 180 });
 $("link").textContent = joinUrl;
 
-onValue(P, s => { players = s.val() || {}; render(); });
-onValue(B, s => { buzz = s.val() || {}; render(); });
+fetch("data/board.json?t=" + Date.now()).then(r => r.json()).then(b => { board = b; render(); });
+onValue(R("players"), s => { players = s.val() || {}; render(); });
+onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
+onValue(R("clue"), s => { clue = s.val(); showAns = false; render(); });
+onValue(R("used"), s => { used = s.val() || {}; render(); });
+
+const curClue = () => { if (!clue) return null; const [i, r] = clue.key.split("-"); return board.categories[i]?.clues[r]; };
 
 function render() {
   const w = buzz.winner && players[buzz.winner];
   $("status").textContent = w ? `${w.name} buzzed first!` : buzz.open ? "Buzzers open…" : "Locked";
+  $("clue").textContent = clue ? `${clue.cat} · ${clue.value}\n${clue.question}` : "Pick a tile on the board";
+  $("ans").textContent = clue ? (showAns ? "Answer: " + (curClue()?.answer || "?") : "👁 Tap to show answer") : "";
+
+  const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
+  let h = cats.map(c => `<div class="cat">${esc(c.name)}</div>`).join("");
+  for (let r = 0; r < rows; r++) cats.forEach((c, i) => {
+    const q = c.clues[r], k = i + "-" + r;
+    h += q ? `<button class="tile" data-k="${k}" ${used[k] || clue ? "disabled" : ""}>${used[k] ? "" : q.value}</button>` : "<div></div>";
+  });
+  $("board").style.gridTemplateColumns = `repeat(${cats.length || 1},1fr)`;
+  $("board").innerHTML = h;
+
   $("players").innerHTML = Object.entries(players).sort((a, b) => a[1].num - b[1].num).map(([id, p]) =>
     `<div class="p ${id === buzz.winner ? "win" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span>
      <button data-a="-" data-id="${id}">−</button><button data-a="+" data-id="${id}">+</button><button data-a="x" data-id="${id}" class="bad">✕</button></div>`).join("");
 }
 
 const val = () => Number($("val").value) || 0;
-const adjust = (id, d) => runTransaction(ref(db, `rooms/${room}/players/${id}/score`), v => (v || 0) + d);
+const pts = () => clue ? clue.value : val();
+const adjust = (id, d) => runTransaction(R(`players/${id}/score`), v => (v || 0) + d);
+const done = mark => { if (clue && mark) set(R("used/" + clue.key), true); set(R("clue"), null); set(R("buzz"), { open: false }); };
+
+$("board").onclick = e => {
+  const k = e.target.dataset.k; if (!k || clue) return;
+  const [i, r] = k.split("-"), c = board.categories[i], q = c.clues[r];
+  set(R("buzz"), { open: false });
+  set(R("clue"), { key: k, cat: c.name, value: q.value, question: q.question });
+};
+$("ans").onclick = () => { showAns = !showAns; render(); };
 
 $("add").onclick = () => {
   const name = $("name").value.trim(); if (!name) return;
   const num = Math.max(0, ...Object.values(players).map(p => p.num)) + 1;
-  push(P, { name, num, score: 0 }); $("name").value = "";
+  push(R("players"), { name, num, score: 0 }); $("name").value = "";
 };
 $("name").onkeydown = e => { if (e.key === "Enter") $("add").click(); };
 $("players").onclick = e => {
   const { a, id } = e.target.dataset; if (!a) return;
-  if (a === "x") { if (confirm(`Remove ${players[id].name}?`)) remove(ref(db, `rooms/${room}/players/${id}`)); }
+  if (a === "x") { if (confirm(`Remove ${players[id].name}?`)) remove(R("players/" + id)); }
   else adjust(id, a === "+" ? val() : -val());
 };
-$("open").onclick = () => set(B, { open: true });
-$("skip").onclick = () => set(B, { open: false });
-$("ok").onclick = () => { if (buzz.winner) { adjust(buzz.winner, val()); set(B, { open: false }); } };
+$("reset").onclick = () => {
+  if (!confirm("Reset all scores and the board?")) return;
+  set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
+  Object.keys(players).forEach(id => set(R(`players/${id}/score`), 0));
+};
+
+$("open").onclick = () => set(R("buzz"), { open: true });
+$("skip").onclick = () => done(true);
+$("cancel").onclick = () => done(false);
+$("ok").onclick = () => { if (buzz.winner) { adjust(buzz.winner, pts()); done(true); } };
 $("bad").onclick = () => {
   if (!buzz.winner) return;
-  adjust(buzz.winner, -val());
-  set(B, { open: true, out: { ...(buzz.out || {}), [buzz.winner]: true } });
+  adjust(buzz.winner, -pts());
+  set(R("buzz"), { open: true, out: { ...(buzz.out || {}), [buzz.winner]: true } });
 };
 </script></body></html>

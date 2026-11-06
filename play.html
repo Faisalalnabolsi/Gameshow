@@ -4,6 +4,7 @@
  <div id="pick" class="card pick" hidden></div>
  <div id="game" hidden>
   <p id="who" class="status"></p>
+  <p id="clue" class="clue"></p>
   <button id="buzz" class="buzz">BUZZ</button>
   <p id="msg" class="status"></p>
   <button id="switch" class="bad">Not you?</button>
@@ -13,9 +14,11 @@
 import { db, ref, onValue, runTransaction, room, esc } from "./common.js";
 const $ = id => document.getElementById(id);
 const key = "pid-" + room;
-let players = {}, buzz = {};
+let players = {}, buzz = {}, clue = null;
 onValue(ref(db, `rooms/${room}/players`), s => { players = s.val() || {}; render(); });
 onValue(ref(db, `rooms/${room}/buzz`), s => { buzz = s.val() || {}; render(); });
+
+onValue(ref(db, `rooms/${room}/clue`), s => { clue = s.val(); render(); });
 
 function render() {
   const me = localStorage.getItem(key);
@@ -30,6 +33,7 @@ function render() {
   const out = buzz.out && buzz.out[me];
   const can = buzz.open && !buzz.winner && !out;
   $("who").textContent = `${mine.name} · ${mine.score} pts`;
+  $("clue").textContent = clue ? `${clue.cat} · ${clue.value}\n${clue.question}` : "";
   $("buzz").disabled = !can;
   $("msg").textContent = buzz.winner ? (buzz.winner === me ? "You buzzed first! 🎉" : `${players[buzz.winner]?.name || "Someone"} buzzed first`)
     : out ? "You're locked out this question" : buzz.open ? "GO!" : "Wait for the host…";
