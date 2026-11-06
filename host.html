@@ -17,7 +17,7 @@
  <div id="players"></div>
 </section>
 </main>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script type="module">
 import { db, ref, set, push, remove, onValue, runTransaction, room, esc } from "./common.js";
 const $ = id => document.getElementById(id);
@@ -25,7 +25,8 @@ const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false;
 
 const joinUrl = new URL("play.html?room=" + room, location.href).href;
-new QRCode($("qr"), { text: joinUrl, width: 180, height: 180 });
+try { const q = qrcode(0, "M"); q.addData(joinUrl); q.make(); $("qr").innerHTML = q.createImgTag(6, 0); }
+catch (e) { $("qr").textContent = "QR failed: " + e.message; }
 $("link").textContent = joinUrl;
 
 fetch("data/board.json?t=" + Date.now()).then(r => r.json()).then(b => { board = b; render(); });

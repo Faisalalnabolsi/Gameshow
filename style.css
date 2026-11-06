@@ -29,3 +29,4 @@ input{font:inherit;color:#ffd84d;background:#ffffff14;border:1px solid #ffffff30
 .tile:disabled{opacity:.2;cursor:default}
 .clue{font-size:1.2rem;color:#ffd84d;margin:8px 0;white-space:pre-line}
 #ans{cursor:pointer;margin-bottom:8px}
+#qr img{display:block;max-width:100%;height:auto;image-rendering:pixelated}
