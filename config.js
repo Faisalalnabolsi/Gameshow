@@ -8,5 +8,4 @@ export const firebaseConfig = {
   appId: "1:1098864026693:web:964bec8451fb3945a4ef2c"
   storageBucket: "faisalgameshow.firebasestorage.app",
   messagingSenderId: "1098864026693",
-
 };
