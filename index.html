@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Game Show</title><link rel="stylesheet" href="style.css"></head><body>
+<div class="stage">
+ <main class="main">
+  <h1>Game Show</h1>
+  <div id="board" class="board"></div>
+  <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="oq" class="q"></div><div id="os" class="status"></div></div>
+ </main>
+ <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
+</div>
+<script type="module">
+import { db, ref, onValue, room, esc } from "./common.js";
+const $ = id => document.getElementById(id);
+const R = p => ref(db, `rooms/${room}/${p}`);
+let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] };
+fetch("data/board.json?t=" + Date.now()).then(r => r.json()).then(b => { board = b; render(); });
+onValue(R("players"), s => { players = s.val() || {}; render(); });
+onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
+onValue(R("clue"), s => { clue = s.val(); render(); });
+onValue(R("used"), s => { used = s.val() || {}; render(); });
+
+function render() {
+  const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
+  let h = cats.map(c => `<div class="cat">${esc(c.name)}</div>`).join("");
+  for (let r = 0; r < rows; r++) cats.forEach((c, i) => {
+    const q = c.clues[r], k = i + "-" + r;
+    h += q ? `<div class="tile ${used[k] ? "used" : ""}">${used[k] ? "" : q.value}</div>` : "<div></div>";
+  });
+  $("board").style.gridTemplateColumns = `repeat(${cats.length || 1},1fr)`;
+  $("board").innerHTML = h;
+
+  $("overlay").hidden = !clue;
+  if (clue) {
+    const w = buzz.winner && players[buzz.winner];
+    $("oc").textContent = `${clue.cat} · ${clue.value}`;
+    $("oq").textContent = clue.question;
+    $("os").textContent = w ? `${w.name} buzzed first!` : buzz.open ? "Buzzers open!" : "Get ready…";
+  }
+
+  const list = Object.entries(players).sort((a, b) => b[1].score - a[1].score);
+  $("sb").innerHTML = list.length ? list.map(([id, p]) =>
+    `<div class="sb ${id === buzz.winner ? "win" : ""} ${buzz.out && buzz.out[id] ? "out" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`).join("")
+    : '<p class="small">Waiting for players…<br>Open this page from the host panel link.</p>';
+}
+</script></body></html>

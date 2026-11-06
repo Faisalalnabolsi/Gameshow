@@ -1,8 +1,8 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jeopardy Host</title><link rel="stylesheet" href="style.css"></head><body>
 <main class="wrap">
-<h1>Jeopardy · Host Panel</h1>
+<h1>Game Show · Host Panel</h1>
 <section class="grid">
- <div class="card center"><h2>Players scan to join</h2><div id="qr"></div><p id="link" class="small"></p></div>
+ <div class="card center"><h2>Players scan to join</h2><div id="qr"></div><p id="link" class="small"></p><p class="small"><a id="disp" target="_blank">Open the big-screen display ↗</a></p></div>
  <div class="card"><h2>Current clue</h2>
   <div id="clue" class="clue"></div>
   <div id="ans" class="small"></div>
@@ -11,11 +11,13 @@
   <label class="small">Manual points (player +/−) <input id="val" type="number" value="200" step="100" style="width:100px"></label>
  </div>
 </section>
+<div class="layout">
 <section class="card"><h2>Board</h2><div id="board" class="board"></div></section>
 <section class="card"><h2>Players</h2>
  <div class="row"><input id="name" placeholder="Player name"><button id="add">Add player</button><button id="reset" class="bad">New game</button></div>
  <div id="players"></div>
 </section>
+</div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script type="module">
@@ -28,6 +30,7 @@ const joinUrl = new URL("play.html?room=" + room, location.href).href;
 try { const q = qrcode(0, "M"); q.addData(joinUrl); q.make(); $("qr").innerHTML = q.createImgTag(6, 0); }
 catch (e) { $("qr").textContent = "QR failed: " + e.message; }
 $("link").textContent = joinUrl;
+$("disp").href = new URL("index.html?room=" + room, location.href).href;
 
 fetch("data/board.json?t=" + Date.now()).then(r => r.json()).then(b => { board = b; render(); });
 onValue(R("players"), s => { players = s.val() || {}; render(); });
