@@ -1,6 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jeopardy Host</title><link rel="stylesheet" href="style.css"></head><body>
 <main class="wrap">
 <h1>Game Show · Host Panel</h1>
+<section id="login" class="card center" hidden style="max-width:420px;margin:auto"><h2>Host login</h2>
+ <div class="row"><input id="em" type="email" placeholder="Email"></div><div class="row"><input id="pw" type="password" placeholder="Password"></div>
+ <button id="signin">Sign in</button><p id="lerr" class="small"></p></section>
+<div id="app" hidden>
 <section class="grid">
  <div class="card center"><h2>Players scan to join</h2><div id="qr"></div><p id="link" class="small"></p><p class="small"><a id="disp" target="_blank">Open the big-screen display ↗</a></p></div>
  <div class="card"><h2>Current clue</h2>
@@ -12,19 +16,20 @@
  </div>
 </section>
 <div class="layout">
-<section class="card"><h2>Board</h2><div id="board" class="board"></div></section>
+<section class="card"><h2>Board</h2><div class="row"><select id="boards"></select><button id="load">Load board</button><a href="editor.html">Edit boards</a></div><div id="board" class="board"></div></section>
 <section class="card"><h2>Players</h2>
  <div class="row"><input id="name" placeholder="Player name"><button id="add">Add player</button><button id="reset" class="bad">New game</button></div>
  <div id="players"></div>
 </section>
 </div>
+</div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script type="module">
-import { db, ref, set, push, remove, onValue, runTransaction, room, esc } from "./common.js";
+import { db, ref, set, push, remove, onValue, runTransaction, room, esc, norm, auth, onAuthStateChanged, signInWithEmailAndPassword } from "./common.js";
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
-let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false;
+let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false, lib = {}, boardId = null;
 
 const joinUrl = new URL("play.html?room=" + room, location.href).href;
 try { const q = qrcode(0, "M"); q.addData(joinUrl); q.make(); $("qr").innerHTML = q.createImgTag(6, 0); }
@@ -32,7 +37,21 @@ catch (e) { $("qr").textContent = "QR failed: " + e.message; }
 $("link").textContent = joinUrl;
 $("disp").href = new URL("index.html?room=" + room, location.href).href;
 
-fetch("data/board.json?t=" + Date.now()).then(r => r.json()).then(b => { board = b; render(); });
+const useBoard = () => { board = lib[boardId] ? norm(lib[boardId]) : { categories: [] }; render(); };
+const fillBoards = () => { $("boards").innerHTML = Object.entries(lib).map(([k, b]) => `<option value="${k}" ${k === boardId ? "selected" : ""}>${esc(b.name || "Untitled")}</option>`).join(""); };
+onValue(R("boardId"), s => { boardId = s.val(); fillBoards(); useBoard(); });
+onAuthStateChanged(auth, u => {
+  $("login").hidden = !!u; $("app").hidden = !u;
+  if (u) onValue(ref(db, "library/boards"), s => { lib = s.val() || {}; fillBoards(); useBoard(); });
+});
+$("signin").onclick = () => signInWithEmailAndPassword(auth, $("em").value, $("pw").value).catch(e => $("lerr").textContent = "Sign-in failed: " + e.code);
+$("load").onclick = async () => {
+  const id = $("boards").value; if (!id) return;
+  if (Object.keys(used).length && !confirm("Loading a board resets the tiles. Continue?")) return;
+  const b = norm(lib[id]);
+  await set(R("board"), { name: b.name, categories: b.categories.map(c => ({ name: c.name, clues: c.clues.map(q => ({ value: q.value, question: q.question })) })) });
+  set(R("boardId"), id); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
+};
 onValue(R("players"), s => { players = s.val() || {}; render(); });
 onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
 onValue(R("clue"), s => { clue = s.val(); showAns = false; render(); });

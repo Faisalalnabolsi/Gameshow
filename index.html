@@ -8,11 +8,11 @@
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
 </div>
 <script type="module">
-import { db, ref, onValue, room, esc } from "./common.js";
+import { db, ref, onValue, room, esc, norm } from "./common.js";
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] };
-fetch("data/board.json?t=" + Date.now()).then(r => r.json()).then(b => { board = b; render(); });
+onValue(R("board"), s => { board = s.val() ? norm(s.val()) : { categories: [] }; render(); });
 onValue(R("players"), s => { players = s.val() || {}; render(); });
 onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
 onValue(R("clue"), s => { clue = s.val(); render(); });

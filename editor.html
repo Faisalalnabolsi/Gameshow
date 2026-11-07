@@ -1,0 +1,83 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Board Editor</title><link rel="stylesheet" href="style.css"></head><body>
+<main class="wrap">
+<h1>Board Editor</h1>
+<section id="login" class="card center" hidden style="max-width:420px;margin:auto"><h2>Host login</h2>
+ <div class="row"><input id="em" type="email" placeholder="Email"></div><div class="row"><input id="pw" type="password" placeholder="Password"></div>
+ <button id="signin">Sign in</button><p id="lerr" class="small"></p></section>
+<div id="app" hidden>
+ <div class="card">
+  <div class="row"><select id="sel"></select><button id="new">New</button><button id="dup" class="bad">Duplicate</button><button id="del" class="bad">Delete</button></div>
+  <div class="row"><label class="small">Import JSON <input id="imp" type="file" accept=".json"></label><button id="exp" class="bad">Export</button><a href="host.html">← Host panel</a><button id="out" class="bad">Sign out</button></div>
+ </div>
+ <div id="ed" hidden>
+  <div class="card row"><input id="bn" class="grow" placeholder="Board name"><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
+  <div id="cats"></div>
+  <button id="addcat">+ Add category</button>
+ </div>
+</div>
+</main>
+<script type="module">
+import { db, ref, set, push, remove, onValue, auth, onAuthStateChanged, signInWithEmailAndPassword, signOut, esc, norm } from "./common.js";
+const $ = id => document.getElementById(id);
+const newClue = n => ({ value: n * 200, question: "", answer: "" });
+let lib = {}, id = null, cur = null;
+
+onAuthStateChanged(auth, u => {
+  $("login").hidden = !!u; $("app").hidden = !u;
+  if (u) onValue(ref(db, "library/boards"), s => { lib = s.val() || {}; fill(); });
+});
+$("signin").onclick = () => signInWithEmailAndPassword(auth, $("em").value, $("pw").value).catch(e => $("lerr").textContent = "Sign-in failed: " + e.code);
+$("out").onclick = () => signOut(auth);
+
+function fill() {
+  const keys = Object.keys(lib);
+  if (id && !lib[id]) { id = null; cur = null; }
+  if (!id && keys.length) { id = keys[0]; cur = structuredClone(norm(lib[id])); }
+  $("sel").innerHTML = keys.map(k => `<option value="${k}" ${k === id ? "selected" : ""}>${esc(lib[k].name)}</option>`).join("");
+  draw();
+}
+function draw() {
+  $("ed").hidden = !cur; if (!cur) return;
+  $("bn").value = cur.name;
+  $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card"><div class="row"><input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="Category name"><button class="bad" data-x="c${i}">Remove category</button></div>`
+    + c.clues.map((q, j) => `<div class="clue-row"><input type="number" data-c="${i}" data-q="${j}" data-f="value" value="${q.value}" style="width:90px"><input data-c="${i}" data-q="${j}" data-f="question" value="${esc(q.question)}" placeholder="Clue shown to players"><input data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">✕</button></div>`).join("")
+    + `<button data-x="a${i}">+ Add clue</button></div>`).join("");
+}
+async function add(b) {
+  const n = push(ref(db, "library/boards")); await set(n, b);
+  id = n.key; cur = structuredClone(norm(b)); fill();
+}
+
+$("sel").onchange = () => { id = $("sel").value; cur = structuredClone(norm(lib[id])); draw(); };
+$("new").onclick = () => add({ name: "New board", categories: [{ name: "Category 1", clues: [newClue(1)] }] });
+$("dup").onclick = () => cur && add({ ...structuredClone(cur), name: cur.name + " (copy)" });
+$("del").onclick = () => { if (id && confirm(`Delete "${cur.name}"?`)) remove(ref(db, `library/boards/${id}`)); };
+$("save").onclick = () => set(ref(db, `library/boards/${id}`), cur).then(() => $("msg").textContent = "Saved ✓").catch(e => $("msg").textContent = "Save failed: " + e.code);
+$("bn").oninput = e => { cur.name = e.target.value; $("msg").textContent = ""; };
+$("addcat").onclick = () => { cur.categories.push({ name: "New category", clues: [newClue(1)] }); draw(); };
+$("cats").oninput = e => {
+  const d = e.target.dataset; if (!d.f) return;
+  const c = cur.categories[d.c], t = d.q === undefined ? c : c.clues[d.q];
+  t[d.f] = d.f === "value" ? Number(e.target.value) || 0 : e.target.value; $("msg").textContent = "";
+};
+$("cats").onclick = e => {
+  const x = e.target.dataset.x; if (!x) return;
+  const n = x.slice(1).split("-").map(Number);
+  if (x[0] === "c") cur.categories.splice(n[0], 1);
+  if (x[0] === "q") cur.categories[n[0]].clues.splice(n[1], 1);
+  if (x[0] === "a") { const cl = cur.categories[n[0]].clues; cl.push(newClue(cl.length + 1)); }
+  draw();
+};
+$("imp").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const j = JSON.parse(await f.text()); if (!j.categories) throw 0; await add({ name: j.name || f.name.replace(/\.json$/, ""), categories: j.categories }); }
+  catch { alert("That isn't a valid board file."); }
+  e.target.value = "";
+};
+$("exp").onclick = () => {
+  if (!cur) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(cur, null, 2)], { type: "application/json" }));
+  a.download = (cur.name || "board") + ".json"; a.click();
+};
+</script></body></html>
