@@ -53,3 +53,8 @@ input::placeholder{color:#b9b2e6}
 .clue-row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
 .clue-row input:nth-child(2),.clue-row input:nth-child(3){flex:1;min-width:140px}
 option{color:#000}
+.items{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin:10px 0}
+.items img{max-height:45vh;max-width:100%;border-radius:18px;box-shadow:0 10px 40px #0008}
+.item{font-size:clamp(1.3rem,3vw,2.4rem);font-weight:600;padding:14px 22px;border-radius:18px;background:#ffffff1f;border:1px solid #ffffff33}
+.lvl{background:#ffffff0d;border:1px solid #ffffff1f;border-radius:18px;padding:12px;margin:10px 0}
+.clue{word-break:break-word}

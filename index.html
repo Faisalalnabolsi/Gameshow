@@ -3,20 +3,22 @@
  <main class="main">
   <h1>Game Show</h1>
   <div id="board" class="board"></div>
-  <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="oq" class="q"></div><div id="os" class="status"></div></div>
+  <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div></div>
  </main>
+ <button id="snd" class="bad" style="position:fixed;right:16px;bottom:16px;z-index:5">🔊 Click once to enable sound</button>
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
 </div>
 <script type="module">
-import { db, ref, onValue, room, esc, norm } from "./common.js";
+import { db, ref, onValue, room, esc, norm, arr, worth } from "./common.js";
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
-let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] };
+let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, au = null, sig = "", lastPlay = 0, media = {};
 onValue(R("board"), s => { board = s.val() ? norm(s.val()) : { categories: [] }; render(); });
 onValue(R("players"), s => { players = s.val() || {}; render(); });
 onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
 onValue(R("clue"), s => { clue = s.val(); render(); });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
+onValue(R("media"), s => { media = s.val() || {}; render(); });
 
 function render() {
   const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
@@ -29,11 +31,13 @@ function render() {
   $("board").innerHTML = h;
 
   $("overlay").hidden = !clue;
-  if (clue) {
-    const w = buzz.winner && players[buzz.winner];
-    $("oc").textContent = `${clue.cat} · ${clue.value}`;
-    $("oq").textContent = clue.question;
+  if (!clue) { au?.pause(); sig = ""; }
+  else {
+    const w = buzz.winner && players[buzz.winner], t = clue.type === "tier";
+    $("oc").textContent = t ? `${clue.cat} · worth ${worth(clue, board.decay)} · clue ${clue.shown}/${clue.total}` : `${clue.cat} · ${clue.value}`;
+    $("oq").textContent = clue.question || "";
     $("os").textContent = w ? `${w.name} buzzed first!` : buzz.open ? "Buzzers open!" : "Get ready…";
+    if (t) items(); else { $("oi").innerHTML = ""; sig = ""; }
   }
 
   const list = Object.entries(players).sort((a, b) => b[1].score - a[1].score);
@@ -41,4 +45,15 @@ function render() {
     `<div class="sb ${id === buzz.winner ? "win" : ""} ${buzz.out && buzz.out[id] ? "out" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`).join("")
     : '<p class="small">Waiting for players…<br>Open this page from the host panel link.</p>';
 }
+const play = u => { au?.pause(); au = new Audio(u); au.play().catch(() => {}); };
+function items() {
+  const src = i => i.v.startsWith("db:") ? (media[i.v.slice(3)] || "") : i.v, its = arr(clue.items), s = clue.key + "|" + its.length + "|" + Object.keys(media).length, la = [...its].reverse().find(i => i.type === "audio");
+  if (s !== sig) {
+    sig = s;
+    $("oi").innerHTML = its.map(i => i.type === "image" ? `<img src="${esc(src(i))}" alt="">` : i.type === "audio" ? '<div class="item">🔊 Audio clue</div>' : `<div class="item">${esc(i.v)}</div>`).join("");
+    if (its[its.length - 1]?.type === "audio") play(src(la));
+  }
+  if (clue.play && clue.play !== lastPlay) { lastPlay = clue.play; if (la) play(src(la)); }
+}
+$("snd").onclick = () => { $("snd").hidden = true; };
 </script></body></html>

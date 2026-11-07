@@ -6,12 +6,13 @@
  <button id="signin">Sign in</button><p id="lerr" class="small"></p></section>
 <div id="app" hidden>
  <div class="card">
-  <div class="row"><select id="sel"></select><button id="new">New</button><button id="dup" class="bad">Duplicate</button><button id="del" class="bad">Delete</button></div>
+  <div class="row"><select id="sel"></select><button id="new">New Jeopardy board</button><button id="newt">New Tier challenge</button><button id="dup" class="bad">Duplicate</button><button id="del" class="bad">Delete</button></div>
   <div class="row"><label class="small">Import JSON <input id="imp" type="file" accept=".json"></label><button id="exp" class="bad">Export</button><a href="host.html">← Host panel</a><button id="out" class="bad">Sign out</button></div>
  </div>
  <div id="ed" hidden>
-  <div class="card row"><input id="bn" class="grow" placeholder="Board name"><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
+  <div class="card row"><input id="bn" class="grow" placeholder="Board name"><label id="dcw" class="small" hidden>Points lost per extra clue (%) <input id="dc" type="number" min="0" max="90" style="width:80px"></label><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
   <div id="cats"></div>
+  <input id="file" type="file" hidden>
   <button id="addcat">+ Add category</button>
  </div>
 </div>
@@ -20,6 +21,7 @@
 import { db, ref, set, push, remove, onValue, auth, onAuthStateChanged, signInWithEmailAndPassword, signOut, esc, norm } from "./common.js";
 const $ = id => document.getElementById(id);
 const newClue = n => ({ value: n * 200, question: "", answer: "" });
+const newLevel = () => ({ answer: "", items: [{ type: "text", v: "" }] });
 let lib = {}, id = null, cur = null;
 
 onAuthStateChanged(auth, u => {
@@ -33,15 +35,23 @@ function fill() {
   const keys = Object.keys(lib);
   if (id && !lib[id]) { id = null; cur = null; }
   if (!id && keys.length) { id = keys[0]; cur = structuredClone(norm(lib[id])); }
-  $("sel").innerHTML = keys.map(k => `<option value="${k}" ${k === id ? "selected" : ""}>${esc(lib[k].name)}</option>`).join("");
+  $("sel").innerHTML = keys.map(k => `<option value="${k}" ${k === id ? "selected" : ""}>${esc(lib[k].name)}${lib[k].type === "tier" ? " (tier)" : ""}</option>`).join("");
   draw();
 }
+let upK = null;
+const shrink = f => new Promise((res, rej) => { const im = new Image(); im.onload = () => { const z = Math.min(1, 900 / Math.max(im.width, im.height)), cv = document.createElement("canvas"); cv.width = im.width * z; cv.height = im.height * z; cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); res(cv.toDataURL("image/jpeg", .75)); }; im.onerror = () => rej(new Error("Couldn't read that image.")); im.src = URL.createObjectURL(f); });
+const readAudio = f => new Promise((res, rej) => { if (f.size > 1.5e6) return rej(new Error("Audio is over 1.5 MB. Trim it, or paste a link instead.")); const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+const jeoHtml = (q, i, j) => `<div class="clue-row"><input type="number" data-c="${i}" data-q="${j}" data-f="value" value="${q.value}" style="width:90px"><input data-c="${i}" data-q="${j}" data-f="question" value="${esc(q.question)}" placeholder="Clue shown to players"><input data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">✕</button></div>`;
+const levelHtml = (q, i, j) => `<div class="lvl"><div class="row"><b>Level ${j + 1}</b><input class="grow" data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">Remove level</button></div>`
+  + q.items.map((it, k) => `<div class="clue-row"><select data-c="${i}" data-q="${j}" data-i="${k}" data-f="type">${["text", "image", "audio"].map(t => `<option ${t === it.type ? "selected" : ""}>${t}</option>`).join("")}</select><input data-c="${i}" data-q="${j}" data-i="${k}" data-f="v" value="${esc(it.v)}" placeholder="Text, or paste a link / upload →">${it.type === "text" ? "" : `<button class="bad" data-up="${i}-${j}-${k}">Upload</button>`}<button class="bad" data-x="i${i}-${j}-${k}">✕</button></div>`).join("")
+  + `<button class="bad" data-x="n${i}-${j}">+ Add clue</button></div>`;
 function draw() {
   $("ed").hidden = !cur; if (!cur) return;
-  $("bn").value = cur.name;
-  $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card"><div class="row"><input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="Category name"><button class="bad" data-x="c${i}">Remove category</button></div>`
-    + c.clues.map((q, j) => `<div class="clue-row"><input type="number" data-c="${i}" data-q="${j}" data-f="value" value="${q.value}" style="width:90px"><input data-c="${i}" data-q="${j}" data-f="question" value="${esc(q.question)}" placeholder="Clue shown to players"><input data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">✕</button></div>`).join("")
-    + `<button data-x="a${i}">+ Add clue</button></div>`).join("");
+  const T = cur.type === "tier";
+  $("bn").value = cur.name; $("dcw").hidden = !T; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
+  $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card"><div class="row"><input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="${T ? "Tier name (e.g. Easy)" : "Category name"}">${T ? `<input type="number" data-c="${i}" data-f="points" value="${c.points ?? 100}" style="width:100px" title="Points">` : ""}<button class="bad" data-x="c${i}">Remove</button></div>`
+    + c.clues.map((q, j) => T ? levelHtml(q, i, j) : jeoHtml(q, i, j)).join("")
+    + `<button data-x="a${i}">+ Add ${T ? "level" : "clue"}</button></div>`).join("");
 }
 async function add(b) {
   const n = push(ref(db, "library/boards")); await set(n, b);
@@ -54,23 +64,35 @@ $("dup").onclick = () => cur && add({ ...structuredClone(cur), name: cur.name + 
 $("del").onclick = () => { if (id && confirm(`Delete "${cur.name}"?`)) remove(ref(db, `library/boards/${id}`)); };
 $("save").onclick = () => set(ref(db, `library/boards/${id}`), cur).then(() => $("msg").textContent = "Saved ✓").catch(e => $("msg").textContent = "Save failed: " + e.code);
 $("bn").oninput = e => { cur.name = e.target.value; $("msg").textContent = ""; };
-$("addcat").onclick = () => { cur.categories.push({ name: "New category", clues: [newClue(1)] }); draw(); };
+$("newt").onclick = () => add({ type: "tier", name: "New tier challenge", decay: 10, categories: [{ name: "Easy", points: 100, clues: [newLevel()] }] });
+$("dc").oninput = e => { cur.decay = Number(e.target.value) || 0; };
+$("addcat").onclick = () => { const n = cur.categories.length; cur.categories.push(cur.type === "tier" ? { name: "Tier " + (n + 1), points: (n + 1) * 100, clues: [newLevel()] } : { name: "New category", clues: [newClue(1)] }); draw(); };
 $("cats").oninput = e => {
   const d = e.target.dataset; if (!d.f) return;
-  const c = cur.categories[d.c], t = d.q === undefined ? c : c.clues[d.q];
-  t[d.f] = d.f === "value" ? Number(e.target.value) || 0 : e.target.value; $("msg").textContent = "";
+  const c = cur.categories[d.c], t = d.i !== undefined ? c.clues[d.q].items[d.i] : d.q === undefined ? c : c.clues[d.q];
+  t[d.f] = ["value", "points"].includes(d.f) ? Number(e.target.value) || 0 : e.target.value; $("msg").textContent = ""; if (d.f === "type") draw();
+};
+$("file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f || !upK) return;
+  const [i, j, k] = upK.split("-").map(Number), it = cur.categories[i].clues[j].items[k];
+  try { const data = it.type === "image" ? await shrink(f) : await readAudio(f); const m = push(ref(db, "library/media")); await set(m, { data, name: f.name }); it.v = "db:" + m.key; draw(); $("msg").textContent = "Uploaded. Press Save."; }
+  catch (err) { alert(err.message || "Upload failed."); }
 };
 $("cats").onclick = e => {
+  const u = e.target.dataset.up;
+  if (u) { upK = u; const [i, j, k] = u.split("-").map(Number); $("file").accept = cur.categories[i].clues[j].items[k].type === "audio" ? "audio/*" : "image/*"; $("file").click(); return; }
   const x = e.target.dataset.x; if (!x) return;
   const n = x.slice(1).split("-").map(Number);
   if (x[0] === "c") cur.categories.splice(n[0], 1);
   if (x[0] === "q") cur.categories[n[0]].clues.splice(n[1], 1);
-  if (x[0] === "a") { const cl = cur.categories[n[0]].clues; cl.push(newClue(cl.length + 1)); }
+  if (x[0] === "i") cur.categories[n[0]].clues[n[1]].items.splice(n[2], 1);
+  if (x[0] === "n") cur.categories[n[0]].clues[n[1]].items.push({ type: "text", v: "" });
+  if (x[0] === "a") { const cl = cur.categories[n[0]].clues; cl.push(cur.type === "tier" ? newLevel() : newClue(cl.length + 1)); }
   draw();
 };
 $("imp").onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
-  try { const j = JSON.parse(await f.text()); if (!j.categories) throw 0; await add({ name: j.name || f.name.replace(/\.json$/, ""), categories: j.categories }); }
+  try { const j = JSON.parse(await f.text()); if (!j.categories) throw 0; await add({ ...j, name: j.name || f.name.replace(/\.json$/, "") }); }
   catch { alert("That isn't a valid board file."); }
   e.target.value = "";
 };

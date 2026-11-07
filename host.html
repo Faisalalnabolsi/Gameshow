@@ -11,7 +11,7 @@
   <div id="clue" class="clue"></div>
   <div id="ans" class="small"></div>
   <div id="status" class="status">Locked</div>
-  <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="skip">Skip</button><button id="cancel" class="bad">Cancel</button></div>
+  <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="next">Next clue ▸</button><button id="replay" class="bad">🔊 Replay</button><button id="skip">Skip</button><button id="cancel" class="bad">Cancel</button></div>
   <label class="small">Manual points (player +/−) <input id="val" type="number" value="200" step="100" style="width:100px"></label>
  </div>
 </section>
@@ -26,7 +26,7 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script type="module">
-import { db, ref, set, push, remove, onValue, runTransaction, room, esc, norm, auth, onAuthStateChanged, signInWithEmailAndPassword } from "./common.js";
+import { db, get, ref, set, push, remove, onValue, runTransaction, room, esc, norm, arr, worth, auth, onAuthStateChanged, signInWithEmailAndPassword } from "./common.js";
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false, lib = {}, boardId = null;
@@ -38,7 +38,7 @@ $("link").textContent = joinUrl;
 $("disp").href = new URL("index.html?room=" + room, location.href).href;
 
 const useBoard = () => { board = lib[boardId] ? norm(lib[boardId]) : { categories: [] }; render(); };
-const fillBoards = () => { $("boards").innerHTML = Object.entries(lib).map(([k, b]) => `<option value="${k}" ${k === boardId ? "selected" : ""}>${esc(b.name || "Untitled")}</option>`).join(""); };
+const fillBoards = () => { $("boards").innerHTML = Object.entries(lib).map(([k, b]) => `<option value="${k}" ${k === boardId ? "selected" : ""}>${esc(b.name || "Untitled")}${b.type === "tier" ? " (tier)" : ""}</option>`).join(""); };
 onValue(R("boardId"), s => { boardId = s.val(); fillBoards(); useBoard(); });
 onAuthStateChanged(auth, u => {
   $("login").hidden = !!u; $("app").hidden = !u;
@@ -49,7 +49,7 @@ $("load").onclick = async () => {
   const id = $("boards").value; if (!id) return;
   if (Object.keys(used).length && !confirm("Loading a board resets the tiles. Continue?")) return;
   const b = norm(lib[id]);
-  await set(R("board"), { name: b.name, categories: b.categories.map(c => ({ name: c.name, clues: c.clues.map(q => ({ value: q.value, question: q.question })) })) });
+  await set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, categories: b.categories.map(c => ({ name: c.name, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "" })) })) });
   set(R("boardId"), id); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
 };
 onValue(R("players"), s => { players = s.val() || {}; render(); });
@@ -62,14 +62,18 @@ const curClue = () => { if (!clue) return null; const [i, r] = clue.key.split("-
 function render() {
   const w = buzz.winner && players[buzz.winner];
   $("status").textContent = w ? `${w.name} buzzed first!` : buzz.open ? "Buzzers open…" : "Locked";
-  $("clue").textContent = clue ? `${clue.cat} · ${clue.value}\n${clue.question}` : "Pick a tile on the board";
+  const tier = clue && clue.type === "tier";
+  $("clue").textContent = !clue ? "Pick a tile on the board" : tier
+    ? `${clue.cat} · worth ${worth(clue, board.decay)} · clue ${clue.shown}/${clue.total}\n` + arr(clue.items).map(i => (i.type === "image" ? "🖼 " : i.type === "audio" ? "🔊 " : "") + i.v).join("\n")
+    : `${clue.cat} · ${clue.value}\n${clue.question}`;
+  $("next").hidden = $("replay").hidden = !tier;
   $("ans").textContent = clue ? (showAns ? "Answer: " + (curClue()?.answer || "?") : "👁 Tap to show answer") : "";
 
   const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
   let h = cats.map(c => `<div class="cat">${esc(c.name)}</div>`).join("");
   for (let r = 0; r < rows; r++) cats.forEach((c, i) => {
     const q = c.clues[r], k = i + "-" + r;
-    h += q ? `<button class="tile" data-k="${k}" ${used[k] || clue ? "disabled" : ""}>${used[k] ? "" : q.value}</button>` : "<div></div>";
+    h += q ? `<button class="tile" data-k="${k}" ${used[k] || clue ? "disabled" : ""}>${used[k] ? "" : (q.value ?? c.points)}</button>` : "<div></div>";
   });
   $("board").style.gridTemplateColumns = `repeat(${cats.length || 1},1fr)`;
   $("board").innerHTML = h;
@@ -80,15 +84,17 @@ function render() {
 }
 
 const val = () => Number($("val").value) || 0;
-const pts = () => clue ? clue.value : val();
+const pts = () => clue ? worth(clue, board.decay) : val();
 const adjust = (id, d) => runTransaction(R(`players/${id}/score`), v => (v || 0) + d);
-const done = mark => { if (clue && mark) set(R("used/" + clue.key), true); set(R("clue"), null); set(R("buzz"), { open: false }); };
+const pub = async its => { for (const i of its) if (i.type !== "text" && i.v?.startsWith("db:")) { const k = i.v.slice(3), d = (await get(ref(db, "library/media/" + k))).val()?.data; if (d) await set(R("media/" + k), d); } };
+const done = mark => { if (clue && mark) set(R("used/" + clue.key), true); set(R("clue"), null); set(R("media"), null); set(R("buzz"), { open: false }); };
 
-$("board").onclick = e => {
+$("board").onclick = async e => {
   const k = e.target.dataset.k; if (!k || clue) return;
   const [i, r] = k.split("-"), c = board.categories[i], q = c.clues[r];
   set(R("buzz"), { open: false });
-  set(R("clue"), { key: k, cat: c.name, value: q.value, question: q.question });
+  if (board.type === "tier") { const it = arr(q.items).filter(x => x.v?.trim()); await pub(it.slice(0, 1)); set(R("clue"), { key: k, cat: c.name, value: c.points, type: "tier", shown: it.length ? 1 : 0, total: it.length, items: it.slice(0, 1) }); }
+  else set(R("clue"), { key: k, cat: c.name, value: q.value, question: q.question });
 };
 $("ans").onclick = () => { showAns = !showAns; render(); };
 
@@ -110,6 +116,8 @@ $("reset").onclick = () => {
 };
 
 $("open").onclick = () => set(R("buzz"), { open: true });
+$("next").onclick = async () => { const all = arr(curClue()?.items).filter(i => i.v?.trim()); if (clue && clue.shown < all.length) { await pub([all[clue.shown]]); set(R("clue"), { ...clue, shown: clue.shown + 1, items: all.slice(0, clue.shown + 1) }); } };
+$("replay").onclick = () => clue && set(R("clue/play"), Date.now());
 $("skip").onclick = () => done(true);
 $("cancel").onclick = () => done(false);
 $("ok").onclick = () => { if (buzz.winner) { adjust(buzz.winner, pts()); done(true); } };
