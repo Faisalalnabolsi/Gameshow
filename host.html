@@ -12,7 +12,8 @@
   <div id="ans" class="small"></div>
   <div id="status" class="status">Locked</div>
   <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="next">Next clue ▸</button><button id="replay" class="bad">🔊 Replay</button><button id="skip">Skip</button><button id="cancel" class="bad">Cancel</button></div>
-  <label class="small">Manual points (player +/−) <input id="val" type="number" value="200" step="100" style="width:100px"></label>
+  <label class="small">Points (fills in from the clue, editable) <input id="val" type="number" value="200" step="100" style="width:100px"></label>
+  <label class="small"><input id="auto" type="checkbox" checked> Open buzzers automatically when a clue is picked</label>
  </div>
 </section>
 <div class="layout">
@@ -54,7 +55,13 @@ $("load").onclick = async () => {
 };
 onValue(R("players"), s => { players = s.val() || {}; render(); });
 onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
-onValue(R("clue"), s => { clue = s.val(); showAns = false; render(); });
+let lastWk = "";
+onValue(R("clue"), s => {
+  clue = s.val(); showAns = false;
+  const wk = clue ? clue.key + "|" + (clue.shown ?? 0) : "";
+  if (wk !== lastWk) { lastWk = wk; if (clue) $("val").value = worth(clue, board.decay); }
+  render();
+});
 onValue(R("used"), s => { used = s.val() || {}; render(); });
 
 const curClue = () => { if (!clue) return null; const [i, r] = clue.key.split("-"); return board.categories[i]?.clues[r]; };
@@ -86,7 +93,9 @@ function render() {
 }
 
 const val = () => Number($("val").value) || 0;
-const pts = () => clue ? worth(clue, board.decay) : val();
+const pts = () => val();
+$("auto").checked = localStorage.getItem("auto") !== "0";
+$("auto").onchange = () => localStorage.setItem("auto", $("auto").checked ? "1" : "0");
 const adjust = (id, d) => runTransaction(R(`players/${id}/score`), v => (v || 0) + d);
 const pub = async its => { for (const i of its) if (i.type !== "text" && i.v?.startsWith("db:")) { const k = i.v.slice(3), d = (await get(ref(db, "library/media/" + k))).val()?.data; if (d) await set(R("media/" + k), d); } };
 const done = mark => { if (clue && mark) set(R("used/" + clue.key), true); set(R("clue"), null); set(R("media"), null); set(R("buzz"), { open: false }); };
@@ -94,7 +103,7 @@ const done = mark => { if (clue && mark) set(R("used/" + clue.key), true); set(R
 $("board").onclick = async e => {
   const k = e.target.dataset.k; if (!k || clue) return;
   const [i, r] = k.split("-"), c = board.categories[i], q = c.clues[r];
-  set(R("buzz"), { open: false });
+  set(R("buzz"), { open: $("auto").checked });
   if (board.type === "tier") { const it = arr(q.items).filter(x => x.v?.trim()); const n = board.allAtOnce ? it.length : Math.min(1, it.length); await pub(it.slice(0, n)); set(R("clue"), { key: k, cat: c.name, value: c.points, type: "tier", all: !!board.allAtOnce, shown: n, total: it.length, items: it.slice(0, n) }); }
   else set(R("clue"), { key: k, cat: c.name, value: q.value, question: q.question });
 };
@@ -122,10 +131,11 @@ $("next").onclick = async () => { const all = arr(curClue()?.items).filter(i => 
 $("replay").onclick = () => clue && set(R("clue/play"), Date.now());
 $("skip").onclick = () => done(true);
 $("cancel").onclick = () => done(false);
-$("ok").onclick = () => { if (buzz.winner) { adjust(buzz.winner, pts()); done(true); } };
+$("ok").onclick = () => { if (buzz.winner) { const nm = players[buzz.winner]?.name || ""; adjust(buzz.winner, pts()); set(R("result"), { t: Date.now(), ok: true, name: nm }); done(true); } };
 $("bad").onclick = () => {
   if (!buzz.winner) return;
   adjust(buzz.winner, -pts());
+  set(R("result"), { t: Date.now(), ok: false, name: players[buzz.winner]?.name || "" });
   set(R("buzz"), { open: true, out: { ...(buzz.out || {}), [buzz.winner]: true } });
 };
 </script></body></html>

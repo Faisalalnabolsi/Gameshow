@@ -4,6 +4,7 @@
   <h1>Game Show</h1>
   <div id="board" class="board"></div>
   <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div></div>
+ <div id="flash" class="flash"></div>
  </main>
  <button id="snd" class="bad" style="position:fixed;right:16px;bottom:16px;z-index:5">🔊 Click once to enable sound</button>
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
@@ -19,6 +20,16 @@ onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
 onValue(R("clue"), s => { clue = s.val(); render(); });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
 onValue(R("media"), s => { media = s.val() || {}; render(); });
+let firstRes = true, lastRes = null;
+onValue(R("result"), s => {
+  const r = s.val();
+  if (firstRes) { firstRes = false; lastRes = r?.t; return; }
+  if (!r || r.t === lastRes) return;
+  lastRes = r.t;
+  const f = $("flash"); f.className = "flash"; void f.offsetWidth;
+  f.innerHTML = `<b>${r.ok ? "CORRECT!" : "WRONG!"}</b><small>${esc(r.name)}</small>`;
+  f.className = "flash show " + (r.ok ? "ok" : "no");
+});
 
 function render() {
   const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
@@ -36,7 +47,7 @@ function render() {
     const w = buzz.winner && players[buzz.winner], t = clue.type === "tier";
     $("oc").textContent = t ? `${clue.cat} · worth ${worth(clue, board.decay)} · clue ${clue.shown}/${clue.total}` : `${clue.cat} · ${clue.value}`;
     $("oq").textContent = clue.question || "";
-    $("os").textContent = w ? `${w.name} buzzed first!` : buzz.open ? "Buzzers open!" : "Get ready…";
+    $("os").className = w ? "status big" : "status"; $("os").textContent = w ? w.name : buzz.open ? "Buzzers open!" : "Get ready…";
     if (t) items(); else { $("oi").innerHTML = ""; sig = ""; }
   }
 
