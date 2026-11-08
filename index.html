@@ -31,7 +31,7 @@ function render() {
   $("board").innerHTML = h;
 
   $("overlay").hidden = !clue;
-  if (!clue) { au?.pause(); sig = ""; }
+  if (!clue) { $("oi").innerHTML = ""; sig = ""; }
   else {
     const w = buzz.winner && players[buzz.winner], t = clue.type === "tier";
     $("oc").textContent = t ? `${clue.cat} · worth ${worth(clue, board.decay)} · clue ${clue.shown}/${clue.total}` : `${clue.cat} · ${clue.value}`;
@@ -45,15 +45,16 @@ function render() {
     `<div class="sb ${id === buzz.winner ? "win" : ""} ${buzz.out && buzz.out[id] ? "out" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`).join("")
     : '<p class="small">Waiting for players…<br>Open this page from the host panel link.</p>';
 }
-const play = u => { au?.pause(); au = new Audio(u); au.play().catch(() => {}); };
+const auds = () => [...$("oi").querySelectorAll("audio")];
+const play = () => { const a = auds(); a.forEach(x => x.pause()); (clue?.all ? a[0] : a[a.length - 1])?.play().catch(() => {}); };
 function items() {
-  const src = i => i.v.startsWith("db:") ? (media[i.v.slice(3)] || "") : i.v, its = arr(clue.items), s = clue.key + "|" + its.length + "|" + Object.keys(media).length, la = [...its].reverse().find(i => i.type === "audio");
+  const src = i => i.v.startsWith("db:") ? (media[i.v.slice(3)] || "") : i.v, its = arr(clue.items), s = clue.key + "|" + its.length + "|" + Object.keys(media).length;
   if (s !== sig) {
     sig = s;
-    $("oi").innerHTML = its.map(i => i.type === "image" ? `<img src="${esc(src(i))}" alt="">` : i.type === "audio" ? '<div class="item">🔊 Audio clue</div>' : `<div class="item">${esc(i.v)}</div>`).join("");
-    if (its[its.length - 1]?.type === "audio") play(src(la));
+    $("oi").innerHTML = its.map(i => i.type === "image" ? `<img src="${esc(src(i))}" referrerpolicy="no-referrer" alt="" onerror="this.outerHTML='<div class=item>⚠ Image failed to load</div>'">` : i.type === "audio" ? `<audio src="${esc(src(i))}" controls preload="auto"></audio>` : `<div class="item">${esc(i.v)}</div>`).join("");
+    if (clue.all ? auds().length : its[its.length - 1]?.type === "audio") play();
   }
-  if (clue.play && clue.play !== lastPlay) { lastPlay = clue.play; if (la) play(src(la)); }
+  if (clue.play && clue.play !== lastPlay) { lastPlay = clue.play; play(); }
 }
 $("snd").onclick = () => { $("snd").hidden = true; };
 </script></body></html>

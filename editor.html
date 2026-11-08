@@ -10,7 +10,7 @@
   <div class="row"><label class="small">Import JSON <input id="imp" type="file" accept=".json"></label><button id="exp" class="bad">Export</button><a href="host.html">← Host panel</a><button id="out" class="bad">Sign out</button></div>
  </div>
  <div id="ed" hidden>
-  <div class="card row"><input id="bn" class="grow" placeholder="Board name"><label id="dcw" class="small" hidden>Points lost per extra clue (%) <input id="dc" type="number" min="0" max="90" style="width:80px"></label><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
+  <div class="card row"><input id="bn" class="grow" placeholder="Board name"><label id="dcw" class="small" hidden>Points lost per extra clue (%) <input id="dc" type="number" min="0" max="90" style="width:80px"></label><label id="aaw" class="small" hidden><input id="aa" type="checkbox"> Show all clues at once</label><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
   <div id="cats"></div>
   <input id="file" type="file" hidden>
   <button id="addcat">+ Add category</button>
@@ -48,7 +48,7 @@ const levelHtml = (q, i, j) => `<div class="lvl"><div class="row"><b>Level ${j +
 function draw() {
   $("ed").hidden = !cur; if (!cur) return;
   const T = cur.type === "tier";
-  $("bn").value = cur.name; $("dcw").hidden = !T; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
+  $("bn").value = cur.name; $("dcw").hidden = !T; $("aaw").hidden = !T; $("aa").checked = !!cur.allAtOnce; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
   $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card"><div class="row"><input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="${T ? "Tier name (e.g. Easy)" : "Category name"}">${T ? `<input type="number" data-c="${i}" data-f="points" value="${c.points ?? 100}" style="width:100px" title="Points">` : ""}<button class="bad" data-x="c${i}">Remove</button></div>`
     + c.clues.map((q, j) => T ? levelHtml(q, i, j) : jeoHtml(q, i, j)).join("")
     + `<button data-x="a${i}">+ Add ${T ? "level" : "clue"}</button></div>`).join("");
@@ -65,6 +65,7 @@ $("del").onclick = () => { if (id && confirm(`Delete "${cur.name}"?`)) remove(re
 $("save").onclick = () => set(ref(db, `library/boards/${id}`), cur).then(() => $("msg").textContent = "Saved ✓").catch(e => $("msg").textContent = "Save failed: " + e.code);
 $("bn").oninput = e => { cur.name = e.target.value; $("msg").textContent = ""; };
 $("newt").onclick = () => add({ type: "tier", name: "New tier challenge", decay: 10, categories: [{ name: "Easy", points: 100, clues: [newLevel()] }] });
+$("aa").onchange = e => { cur.allAtOnce = e.target.checked; };
 $("dc").oninput = e => { cur.decay = Number(e.target.value) || 0; };
 $("addcat").onclick = () => { const n = cur.categories.length; cur.categories.push(cur.type === "tier" ? { name: "Tier " + (n + 1), points: (n + 1) * 100, clues: [newLevel()] } : { name: "New category", clues: [newClue(1)] }); draw(); };
 $("cats").oninput = e => {
