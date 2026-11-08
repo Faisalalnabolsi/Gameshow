@@ -132,11 +132,15 @@ $("next").onclick = async () => { const all = arr(curClue()?.items).filter(i => 
 $("replay").onclick = () => clue && set(R("clue/play"), Date.now());
 $("skip").onclick = () => done(true);
 $("cancel").onclick = () => done(false);
-$("ok").onclick = () => { if (buzz.winner) { const nm = players[buzz.winner]?.name || ""; adjust(buzz.winner, pts()); set(R("result"), { t: Date.now(), ok: true, name: nm }); done(true); } };
+const result = (ok, d) => {
+  const w = buzz.winner, p = players[w];
+  set(R("result"), { t: Date.now(), ok, name: p?.name || "", id: w, from: p?.score || 0, to: (p?.score || 0) + d,
+    rows: Object.entries(players).map(([id, q]) => ({ id, num: q.num, name: q.name, from: q.score, to: q.score + (id === w ? d : 0) })) });
+};
+$("ok").onclick = () => { if (buzz.winner) { const d = pts(); result(true, d); adjust(buzz.winner, d); done(true); } };
 $("bad").onclick = () => {
   if (!buzz.winner) return;
-  adjust(buzz.winner, -pts());
-  set(R("result"), { t: Date.now(), ok: false, name: players[buzz.winner]?.name || "" });
+  const d = pts(); result(false, -d); adjust(buzz.winner, -d);
   set(R("buzz"), { open: true, out: { ...(buzz.out || {}), [buzz.winner]: true } });
 };
 </script></body></html>

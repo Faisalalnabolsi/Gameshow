@@ -76,3 +76,26 @@ option{color:#000}
 .cd{font-size:clamp(8rem,32vw,26rem);font-weight:800;line-height:1;color:#fff;text-shadow:0 0 80px #ec4899,0 0 160px #8b5cf6}
 .cd.go{animation:cd 1s ease-out forwards}
 @keyframes cd{0%{opacity:0;transform:scale(.4)}25%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
+.flash.show{animation:popin .55s ease-out forwards}
+.flash.out{opacity:1;animation:fadeout .6s ease forwards}
+.flash .who{display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:1vw 3vw}
+.flash .nm{font-size:clamp(2rem,6vw,5rem);font-weight:600;color:#fff}
+.flash .sc{font-size:clamp(3rem,9vw,8rem);font-weight:800;display:inline-block}
+.flash .sc.ok{color:#4ade80;text-shadow:0 0 40px #22c55e}
+.flash .sc.no{color:#f87171;text-shadow:0 0 40px #ef4444}
+.lb{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;padding:4vh 5vw;border-radius:28px;background:linear-gradient(135deg,#1b0f4aef,#4a1470ef);-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);border:1px solid #ffffff44;pointer-events:none}
+.lb.show,.lb.out{display:flex}
+.lb.show{animation:popin .55s ease-out forwards}
+.lb.out{animation:fadeout .6s ease forwards}
+.lb h2{font-size:clamp(2rem,5vw,4rem);margin:0 0 2vh;color:#fff;letter-spacing:.12em}
+.lbl{position:relative;width:min(100%,900px);--rh:clamp(52px,calc(70vh / var(--n)),96px);height:calc(var(--rh) * var(--n))}
+.lbr{position:absolute;left:0;right:0;top:0;height:calc(var(--rh) - 10px);display:flex;align-items:center;gap:2vw;padding:0 2.5vw;border-radius:18px;background:#ffffff1f;border:1px solid #ffffff33;transition:transform 1s cubic-bezier(.3,.9,.3,1),background .6s,box-shadow .6s;font-size:clamp(1.2rem,2.6vw,2.4rem)}
+.lbr .rk{width:1.6em;font-weight:800;color:#67e8f9}
+.lbr .nm{flex:1;font-weight:600}
+.lbr .sc{font-weight:800;color:#fbbf24;min-width:3.5em;text-align:right;display:inline-block}
+.lbr .ar{width:3.6em;font-weight:800}
+.lbr.ok{background:#064e3bcc;box-shadow:0 0 40px #22c55e88}
+.lbr.no{background:#7f1d1dcc;box-shadow:0 0 40px #ef444488}
+.ar .up{color:#4ade80}.ar .dn{color:#f87171}
+@keyframes popin{0%{opacity:0;transform:scale(.5)}60%{transform:scale(1.07)}100%{opacity:1;transform:scale(1)}}
+@keyframes fadeout{from{opacity:1}to{opacity:0}}

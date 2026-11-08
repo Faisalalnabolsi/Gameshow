@@ -5,6 +5,7 @@
   <div id="board" class="board"></div>
   <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="cd" class="cd"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div></div>
  <div id="flash" class="flash"></div>
+ <div id="lb" class="lb"></div>
  </main>
  <button id="snd" class="bad" style="position:fixed;right:16px;bottom:16px;z-index:5">🔊 Click once to enable sound</button>
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
@@ -26,10 +27,48 @@ onValue(R("result"), s => {
   if (firstRes) { firstRes = false; lastRes = r?.t; return; }
   if (!r || r.t === lastRes) return;
   lastRes = r.t;
-  const f = $("flash"); f.className = "flash"; void f.offsetWidth;
-  f.innerHTML = `<b>${r.ok ? "CORRECT!" : "WRONG!"}</b><small>${esc(r.name)}</small>`;
-  f.className = "flash show " + (r.ok ? "ok" : "no");
+  runResult(r);
 });
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const countTo = (el, from, to, dur, pulse) => new Promise(res => {
+  const t0 = performance.now();
+  const tick = now => {
+    const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from) * e);
+    if (pulse) el.style.transform = `scale(${1 + 0.22 * Math.abs(Math.sin(p * Math.PI * 5))})`;
+    if (p < 1) requestAnimationFrame(tick); else { el.style.transform = ""; res(); }
+  };
+  requestAnimationFrame(tick);
+});
+let resTok = 0;
+async function runResult(r) {
+  const tok = ++resTok, live = () => tok === resTok, f = $("flash"), lb = $("lb"), c = r.ok ? "ok" : "no";
+  lb.className = "lb"; f.className = "flash"; void f.offsetWidth;
+  f.innerHTML = `<b>${r.ok ? "CORRECT!" : "WRONG!"}</b><div class="who"><span class="nm">${esc(r.name)}</span><span class="sc ${c}">${r.from}</span></div>`;
+  f.className = "flash show " + c;
+  await sleep(1100); if (!live()) return;
+  await countTo(f.querySelector(".sc"), r.from, r.to, 1800, true); if (!live()) return;
+  await sleep(2000); if (!live()) return;
+  f.className = "flash out " + c; await sleep(600); if (!live()) return;
+  f.className = "flash";
+
+  const rows = arr(r.rows), rank = k => [...rows].sort((a, b) => b[k] - a[k] || a.num - b.num).map(x => x.id), r0 = rank("from"), r1 = rank("to");
+  lb.innerHTML = `<h2>Leaderboard</h2><div class="lbl" style="--n:${rows.length}">` + rows.map(x =>
+    `<div class="lbr" data-id="${x.id}" style="transform:translateY(calc(var(--rh) * ${r0.indexOf(x.id)}))"><span class="rk">${r0.indexOf(x.id) + 1}</span><span class="nm">${esc(x.name)}</span><span class="sc">${x.from}</span><span class="ar"></span></div>`).join("") + "</div>";
+  lb.className = "lb show";
+  await sleep(1500); if (!live()) return;
+  rows.forEach(x => {
+    const el = lb.querySelector(`[data-id="${x.id}"]`), a = r0.indexOf(x.id), b = r1.indexOf(x.id);
+    el.style.transform = `translateY(calc(var(--rh) * ${b}))`;
+    el.querySelector(".rk").textContent = b + 1;
+    if (x.id === r.id) { el.classList.add(c); countTo(el.querySelector(".sc"), x.from, x.to, 1400, true); }
+    if (a !== b) el.querySelector(".ar").innerHTML = `<span class="${b < a ? "up" : "dn"}">${b < a ? "▲" : "▼"} ${Math.abs(a - b)}</span>`;
+  });
+  await sleep(5000); if (!live()) return;
+  lb.className = "lb out"; await sleep(600); if (!live()) return;
+  lb.className = "lb";
+}
 
 let counting = false, cdKey = null, cdTok = 0;
 function runCount() {
