@@ -51,7 +51,7 @@ $("load").onclick = async () => {
   if (Object.keys(used).length && !confirm("Loading a board resets the tiles. Continue?")) return;
   const b = norm(lib[id]);
   await set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, categories: b.categories.map(c => ({ name: c.name, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "" })) })) });
-  set(R("boardId"), id); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
+  set(R("boardId"), id); set(R("start"), Date.now()); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
 };
 onValue(R("players"), s => { players = s.val() || {}; render(); });
 onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
@@ -124,7 +124,7 @@ $("players").onclick = e => {
 $("reset").onclick = () => {
   if (!confirm("Reset all scores and the board?")) return;
   set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
-  Object.keys(players).forEach(id => set(R(`players/${id}/score`), 0));
+  set(R("start"), Date.now()); Object.keys(players).forEach(id => set(R(`players/${id}/score`), 0));
 };
 
 $("open").onclick = () => set(R("buzz"), { open: true });

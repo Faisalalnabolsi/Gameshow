@@ -8,10 +8,65 @@
  <div id="lb" class="lb"></div>
  </main>
  <button id="snd" class="bad" style="position:fixed;right:16px;bottom:16px;z-index:5">🔊 Click once to enable sound</button>
+ <button id="mute" class="bad" hidden style="position:fixed;right:16px;bottom:16px;z-index:5">🔊</button>
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
 </div>
 <script type="module">
 import { db, ref, onValue, room, esc, norm, arr, worth } from "./common.js";
+
+// ===== TIMINGS (milliseconds): edit these numbers to tune the animations =====
+const TIME = {
+  countStep: 1000,    // how long each number of the 3-2-1 countdown lasts
+  overlay: 500,       // clue panel fading in / out
+  popIn: 550,         // CORRECT/WRONG and leaderboard screens popping in
+  fade: 700,          // fade-out and the crossfade between screens
+  resultHold0: 1100,  // CORRECT/WRONG sits still before the score starts counting
+  scoreCount: 1800,   // score counting up/down on the result screen
+  pulses: 5,          // number of size pulses while the score counts
+  resultHold1: 2000,  // pause after the score finishes, before the leaderboard
+  lbShow: 1500,       // leaderboard visible before the names start moving
+  lbMove: 1000,       // names sliding to their new positions
+  lbScore: 1400,      // score counting on the leaderboard
+  lbHold: 5000,       // leaderboard stays after moving, then fades out
+};
+for (const [k, v] of Object.entries({ ov: TIME.overlay, pop: TIME.popIn, fade: TIME.fade, count: TIME.countStep, move: TIME.lbMove })) document.documentElement.style.setProperty("--t-" + k, v + "ms");
+// ==============================================================================
+// ===== SOUNDS: built-in synthesized effects, no files needed =====
+const SFX = { on: localStorage.getItem("sfx") !== "0", vol: 0.6 };   // vol: 0 (silent) to 1 (loud)
+// To use your own file for any effect, upload it to the repo and add it here, e.g. { correct: "sounds/correct.mp3" }
+const CUSTOM = {};
+let ac = null;
+const ctx = () => ac || (ac = new (window.AudioContext || window.webkitAudioContext)());
+function tone(freq, start, dur, type = "sine", vol = 0.25, endFreq) {
+  const c = ctx(), o = c.createOscillator(), g = c.createGain(), t = c.currentTime + start;
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * SFX.vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+const SOUND = {
+  start: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.4, "triangle", 0.3)); tone(1047, 0.55, 0.9, "sawtooth", 0.1); tone(1319, 0.55, 0.9, "sine", 0.25); },
+  count: () => tone(660, 0, 0.2, "square", 0.14),
+  reveal: () => { tone(880, 0, 0.14, "triangle", 0.3); tone(1320, 0.09, 0.4, "triangle", 0.3); tone(1760, 0.18, 0.5, "sine", 0.15); },
+  open: () => tone(988, 0, 0.14, "sine", 0.2),
+  buzz: () => { tone(300, 0, 0.4, "sawtooth", 0.22, 560); tone(600, 0.02, 0.35, "square", 0.08, 1000); },
+  correct: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, 0.42, "triangle", 0.3)); tone(1319, 0.4, 0.8, "sine", 0.25); },
+  wrong: () => { tone(220, 0, 0.6, "sawtooth", 0.28, 110); tone(165, 0, 0.6, "square", 0.14, 80); },
+  tick: (up, p) => tone(up ? 500 + 900 * p : 1400 - 900 * p, 0, 0.06, "square", 0.09),
+  swoosh: () => tone(200, 0, 0.6, "sine", 0.18, 1400),
+  whoosh: () => tone(1000, 0, 0.45, "sawtooth", 0.07, 200),
+};
+function sfx(name, ...a) {
+  if (!SFX.on) return;
+  try {
+    ctx().resume();
+    if (CUSTOM[name]) { const au = new Audio(CUSTOM[name]); au.volume = SFX.vol; au.play().catch(() => {}); return; }
+    SOUND[name]?.(...a);
+  } catch {}
+}
+// ==============================================================================
+let lastW = null, lastOpen = false, firstStart = true;
+let ovT = 0;
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, au = null, sig = "", lastPlay = 0, media = {};
@@ -21,6 +76,7 @@ onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
 onValue(R("clue"), s => { clue = s.val(); render(); });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
 onValue(R("media"), s => { media = s.val() || {}; render(); });
+onValue(R("start"), () => { if (firstStart) { firstStart = false; return; } sfx("start"); });
 let firstRes = true, lastRes = null;
 onValue(R("result"), s => {
   const r = s.val();
@@ -32,11 +88,12 @@ onValue(R("result"), s => {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const countTo = (el, from, to, dur, pulse) => new Promise(res => {
-  const t0 = performance.now();
+  const t0 = performance.now(); let lt = 0;
   const tick = now => {
     const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    if (pulse && from !== to && p < 1 && now - lt > 75) { lt = now; sfx("tick", to >= from, p); }
     el.textContent = Math.round(from + (to - from) * e);
-    if (pulse) el.style.transform = `scale(${1 + 0.22 * Math.abs(Math.sin(p * Math.PI * 5))})`;
+    if (pulse) el.style.transform = `scale(${1 + 0.22 * Math.abs(Math.sin(p * Math.PI * TIME.pulses))})`;
     if (p < 1) requestAnimationFrame(tick); else { el.style.transform = ""; res(); }
   };
   requestAnimationFrame(tick);
@@ -46,27 +103,28 @@ async function runResult(r) {
   const tok = ++resTok, live = () => tok === resTok, f = $("flash"), lb = $("lb"), c = r.ok ? "ok" : "no";
   lb.className = "lb"; f.className = "flash"; void f.offsetWidth;
   f.innerHTML = `<b>${r.ok ? "CORRECT!" : "WRONG!"}</b><div class="who"><span class="nm">${esc(r.name)}</span><span class="sc ${c}">${r.from}</span></div>`;
-  f.className = "flash show " + c;
-  await sleep(1100); if (!live()) return;
-  await countTo(f.querySelector(".sc"), r.from, r.to, 1800, true); if (!live()) return;
-  await sleep(2000); if (!live()) return;
-  f.className = "flash out " + c; await sleep(600); if (!live()) return;
-  f.className = "flash";
+  f.className = "flash show " + c; sfx(r.ok ? "correct" : "wrong");
+  await sleep(TIME.resultHold0); if (!live()) return;
+  await countTo(f.querySelector(".sc"), r.from, r.to, TIME.scoreCount, true); if (!live()) return;
+  await sleep(TIME.resultHold1); if (!live()) return;
 
   const rows = arr(r.rows), rank = k => [...rows].sort((a, b) => b[k] - a[k] || a.num - b.num).map(x => x.id), r0 = rank("from"), r1 = rank("to");
   lb.innerHTML = `<h2>Leaderboard</h2><div class="lbl" style="--n:${rows.length}">` + rows.map(x =>
     `<div class="lbr" data-id="${x.id}" style="transform:translateY(calc(var(--rh) * ${r0.indexOf(x.id)}))"><span class="rk">${r0.indexOf(x.id) + 1}</span><span class="nm">${esc(x.name)}</span><span class="sc">${x.from}</span><span class="ar"></span></div>`).join("") + "</div>";
-  lb.className = "lb show";
-  await sleep(1500); if (!live()) return;
+  lb.className = "lb show"; f.className = "flash out " + c; sfx("swoosh");   // crossfade: leaderboard in while the result fades out
+  await sleep(TIME.fade); if (!live()) return;
+  f.className = "flash";
+  await sleep(Math.max(0, TIME.lbShow - TIME.fade)); if (!live()) return;
+  sfx("whoosh");
   rows.forEach(x => {
     const el = lb.querySelector(`[data-id="${x.id}"]`), a = r0.indexOf(x.id), b = r1.indexOf(x.id);
     el.style.transform = `translateY(calc(var(--rh) * ${b}))`;
     el.querySelector(".rk").textContent = b + 1;
-    if (x.id === r.id) { el.classList.add(c); countTo(el.querySelector(".sc"), x.from, x.to, 1400, true); }
+    if (x.id === r.id) { el.classList.add(c); countTo(el.querySelector(".sc"), x.from, x.to, TIME.lbScore, true); }
     if (a !== b) el.querySelector(".ar").innerHTML = `<span class="${b < a ? "up" : "dn"}">${b < a ? "▲" : "▼"} ${Math.abs(a - b)}</span>`;
   });
-  await sleep(5000); if (!live()) return;
-  lb.className = "lb out"; await sleep(600); if (!live()) return;
+  await sleep(TIME.lbHold); if (!live()) return;
+  lb.className = "lb out"; await sleep(TIME.fade); if (!live()) return;
   lb.className = "lb";
 }
 
@@ -75,14 +133,19 @@ function runCount() {
   const tok = ++cdTok, el = $("cd"); let n = 3;
   const step = () => {
     if (tok !== cdTok || !clue) return;
-    if (n === 0) { counting = false; render(); return; }
-    el.textContent = n; el.className = "cd"; void el.offsetWidth; el.className = "cd go";
-    n--; setTimeout(step, 1000);
+    if (n === 0) { counting = false; sfx("reveal"); render(); return; }
+    sfx("count"); el.textContent = n; el.className = "cd"; void el.offsetWidth; el.className = "cd go";
+    n--; setTimeout(step, TIME.countStep);
   };
   step();
 }
 
 function render() {
+  const wid = buzz.winner || null;
+  if (wid && wid !== lastW) sfx("buzz");
+  lastW = wid;
+  if (buzz.open && !lastOpen) sfx("open");
+  lastOpen = !!buzz.open;
   const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
   let h = cats.map(c => `<div class="cat">${esc(c.name)}</div>`).join("");
   for (let r = 0; r < rows; r++) cats.forEach((c, i) => {
@@ -92,7 +155,9 @@ function render() {
   $("board").style.gridTemplateColumns = `repeat(${cats.length || 1},1fr)`;
   $("board").innerHTML = h;
 
-  $("overlay").hidden = !clue;
+  const ov = $("overlay");
+  if (clue) { clearTimeout(ovT); ov.classList.remove("out"); ov.hidden = false; }
+  else if (!ov.hidden && !ov.classList.contains("out")) { ov.classList.add("out"); ovT = setTimeout(() => { ov.hidden = true; ov.classList.remove("out"); }, TIME.overlay); }
   if (!clue) { $("oi").innerHTML = ""; sig = ""; counting = false; cdKey = null; cdTok++; $("overlay").classList.remove("counting"); }
   else {
     const w = buzz.winner && players[buzz.winner], t = clue.type === "tier";
@@ -106,9 +171,9 @@ function render() {
     if (t) { if (!counting) items(); } else { $("oi").innerHTML = ""; sig = ""; }
   }
 
-  const list = Object.entries(players).sort((a, b) => b[1].score - a[1].score);
-  $("sb").innerHTML = list.length ? list.map(([id, p]) =>
-    `<div class="sb ${id === buzz.winner ? "win" : ""} ${buzz.out && buzz.out[id] ? "out" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`).join("")
+  const list = Object.entries(players).sort((a, b) => b[1].score - a[1].score || a[1].num - b[1].num);
+  $("sb").innerHTML = list.length ? list.map(([id, p], i) =>
+    `<div class="sb ${id === buzz.winner ? "win" : ""} ${buzz.out && buzz.out[id] ? "out" : ""}"><b>${i + 1}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`).join("")
     : '<p class="small">Waiting for players…<br>Open this page from the host panel link.</p>';
 }
 const auds = () => [...$("oi").querySelectorAll("audio")];
@@ -116,11 +181,13 @@ const play = () => { const a = auds(); a.forEach(x => x.pause()); (clue?.all ? a
 function items() {
   const src = i => i.v.startsWith("db:") ? (media[i.v.slice(3)] || "") : i.v, its = arr(clue.items), s = clue.key + "|" + its.length + "|" + Object.keys(media).length;
   if (s !== sig) {
+    if (sig) sfx("reveal");
     sig = s;
     $("oi").innerHTML = its.map(i => i.type === "image" ? `<img src="${esc(src(i))}" referrerpolicy="no-referrer" alt="" onerror="this.outerHTML='<div class=item>⚠ Image failed to load</div>'">` : i.type === "audio" ? `<audio src="${esc(src(i))}" controls preload="auto"></audio>` : `<div class="item">${esc(i.v)}</div>`).join("");
     if (clue.all ? auds().length : its[its.length - 1]?.type === "audio") play();
   }
   if (clue.play && clue.play !== lastPlay) { lastPlay = clue.play; play(); }
 }
-$("snd").onclick = () => { $("snd").hidden = true; };
+$("snd").onclick = () => { ctx().resume(); $("snd").hidden = true; $("mute").hidden = false; $("mute").textContent = SFX.on ? "🔊" : "🔇"; sfx("open"); };
+$("mute").onclick = () => { SFX.on = !SFX.on; localStorage.setItem("sfx", SFX.on ? "1" : "0"); $("mute").textContent = SFX.on ? "🔊" : "🔇"; if (SFX.on) sfx("open"); };
 </script></body></html>
