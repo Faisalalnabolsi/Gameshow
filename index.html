@@ -3,7 +3,7 @@
  <main class="main">
   <h1>Game Show</h1>
   <div id="board" class="board"></div>
-  <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div></div>
+  <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="cd" class="cd"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div></div>
  <div id="flash" class="flash"></div>
  </main>
  <button id="snd" class="bad" style="position:fixed;right:16px;bottom:16px;z-index:5">🔊 Click once to enable sound</button>
@@ -31,6 +31,18 @@ onValue(R("result"), s => {
   f.className = "flash show " + (r.ok ? "ok" : "no");
 });
 
+let counting = false, cdKey = null, cdTok = 0;
+function runCount() {
+  const tok = ++cdTok, el = $("cd"); let n = 3;
+  const step = () => {
+    if (tok !== cdTok || !clue) return;
+    if (n === 0) { counting = false; render(); return; }
+    el.textContent = n; el.className = "cd"; void el.offsetWidth; el.className = "cd go";
+    n--; setTimeout(step, 1000);
+  };
+  step();
+}
+
 function render() {
   const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
   let h = cats.map(c => `<div class="cat">${esc(c.name)}</div>`).join("");
@@ -42,13 +54,17 @@ function render() {
   $("board").innerHTML = h;
 
   $("overlay").hidden = !clue;
-  if (!clue) { $("oi").innerHTML = ""; sig = ""; }
+  if (!clue) { $("oi").innerHTML = ""; sig = ""; counting = false; cdKey = null; cdTok++; $("overlay").classList.remove("counting"); }
   else {
     const w = buzz.winner && players[buzz.winner], t = clue.type === "tier";
-    $("oc").textContent = t ? `${clue.cat} · worth ${worth(clue, board.decay)} · clue ${clue.shown}/${clue.total}` : `${clue.cat} · ${clue.value}`;
+    if (clue.key !== cdKey) { cdKey = clue.key; counting = true; runCount(); }
+    const lvl = Number(clue.key.split("-")[1]) + 1;
+    const sec = t ? `Level ${lvl} · worth ${worth(clue, board.decay)}` + (counting ? "" : ` · clue ${clue.shown}/${clue.total}`) : `${clue.value}`;
+    $("oc").innerHTML = `<div class="h1">${esc(clue.cat)}</div><div class="h2">${esc(sec)}</div>`;
     $("oq").textContent = clue.question || "";
     $("os").className = w ? "status big" : "status"; $("os").textContent = w ? w.name : buzz.open ? "Buzzers open!" : "Get ready…";
-    if (t) items(); else { $("oi").innerHTML = ""; sig = ""; }
+    $("overlay").classList.toggle("counting", counting);
+    if (t) { if (!counting) items(); } else { $("oi").innerHTML = ""; sig = ""; }
   }
 
   const list = Object.entries(players).sort((a, b) => b[1].score - a[1].score);

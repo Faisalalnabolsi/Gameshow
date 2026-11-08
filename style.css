@@ -69,3 +69,10 @@ option{color:#000}
 .flash small{font-size:clamp(1.6rem,4.5vw,4rem);color:#fff;font-weight:600}
 .flash.show{animation:pop 2.4s ease forwards}
 @keyframes pop{0%{opacity:0;transform:scale(.5)}12%{opacity:1;transform:scale(1.07)}20%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:scale(1.04)}}
+.overlay .cl .h1{font-size:clamp(1.8rem,4vw,3.6rem);color:#fff;letter-spacing:.08em}
+.overlay .cl .h2{font-size:clamp(1.2rem,2.6vw,2.4rem);color:#67e8f9;margin-top:.3em;letter-spacing:.06em}
+.overlay:not(.counting) .cd{display:none}
+.overlay.counting .q,.overlay.counting .items,.overlay.counting .status{display:none}
+.cd{font-size:clamp(8rem,32vw,26rem);font-weight:800;line-height:1;color:#fff;text-shadow:0 0 80px #ec4899,0 0 160px #8b5cf6}
+.cd.go{animation:cd 1s ease-out forwards}
+@keyframes cd{0%{opacity:0;transform:scale(.4)}25%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.9)}}
