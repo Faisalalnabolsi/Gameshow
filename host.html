@@ -6,7 +6,7 @@
  <button id="signin">Sign in</button><p id="lerr" class="small"></p></section>
 <div id="app" hidden>
 <section class="grid">
- <div class="card center"><h2>Players scan to join</h2><div id="qr"></div><p id="link" class="small"></p><p class="small"><a id="disp" target="_blank">Open the big-screen display ↗</a></p></div>
+ <div class="card center"><h2>Players scan to join</h2><div id="qr"></div><p id="link" class="small"></p><p class="small"><a id="disp" target="_blank">Open the big-screen display ↗</a></p><p class="small">Room: <b id="rm"></b> <button id="chg" class="bad" style="padding:4px 10px">Change room</button></p></div>
  <div class="card"><h2>Current clue</h2>
   <div id="clue" class="clue"></div><div id="pv" class="items"></div>
   <div id="ans" class="small"></div>
@@ -14,6 +14,7 @@
   <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="next">Next clue ▸</button><button id="replay" class="bad">🔊 Replay</button><button id="skip">Skip</button><button id="cancel" class="bad">Cancel</button></div>
   <label class="small">Points (fills in from the clue, editable) <input id="val" type="number" value="200" step="100" style="width:100px"></label>
   <label class="small"><input id="auto" type="checkbox" checked> Open buzzers automatically when a clue is picked</label>
+  <label class="small"><input id="tm" type="checkbox"> Answer timer after a buzz</label> <label class="small">Seconds <input id="tmv" type="number" value="10" min="1" max="300" style="width:80px"></label>
  </div>
 </section>
 <div class="layout">
@@ -28,7 +29,7 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script type="module">
-import { db, get, ref, set, push, remove, onValue, runTransaction, room, esc, norm, arr, worth, auth, onAuthStateChanged, signInWithEmailAndPassword } from "./common.js";
+import { db, get, ref, set, push, remove, onValue, runTransaction, room, cleanRoom, esc, norm, arr, worth, auth, onAuthStateChanged, signInWithEmailAndPassword } from "./common.js";
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false, lib = {}, boardId = null, pvSig = "";
@@ -44,6 +45,7 @@ const fillBoards = () => { $("boards").innerHTML = Object.entries(lib).map(([k, 
 onValue(R("boardId"), s => { boardId = s.val(); fillBoards(); useBoard(); });
 onAuthStateChanged(auth, u => {
   $("login").hidden = !!u; $("app").hidden = !u;
+  if (u) syncRoom();
   if (u) onValue(ref(db, "library/boards"), s => { lib = s.val() || {}; fillBoards(); useBoard(); });
 });
 $("signin").onclick = () => signInWithEmailAndPassword(auth, $("em").value, $("pw").value).catch(e => $("lerr").textContent = "Sign-in failed: " + e.code);
@@ -55,7 +57,40 @@ $("load").onclick = async () => {
   set(R("boardId"), id); set(R("start"), Date.now()); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
 };
 onValue(R("players"), s => { players = s.val() || {}; render(); });
-onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
+onValue(R("buzz"), s => { buzz = s.val() || {}; render(); watchTimer(); });
+
+// ----- rooms: every host window follows the same room -----
+$("rm").textContent = room;
+$("chg").onclick = () => {
+  const n = prompt("Room code (letters and numbers). Leave blank for a new random room:", room); if (n === null) return;
+  location.href = "host.html?room=" + (cleanRoom(n) || Math.random().toString(36).slice(2, 7));
+};
+async function syncRoom() {
+  const saved = (await get(ref(db, "library/room"))).val();
+  if (!new URLSearchParams(location.search).has("room") && saved && saved !== room) location.replace("host.html?room=" + saved);
+  else set(ref(db, "library/room"), room);
+}
+
+// ----- answer timer -----
+$("tm").checked = localStorage.getItem("tm") === "1"; $("tmv").value = localStorage.getItem("tmv") || 10;
+$("tm").onchange = () => localStorage.setItem("tm", $("tm").checked ? "1" : "0");
+$("tmv").onchange = () => localStorage.setItem("tmv", $("tmv").value);
+let tmId = null, tmT = null, tmClr = null;
+function watchTimer() {
+  if (buzz.winner && !tmId && $("tm").checked) {
+    const id = tmId = buzz.winner, secs = Math.max(1, Number($("tmv").value) || 10);
+    clearTimeout(tmClr);
+    set(R("timer"), { id, secs, tok: Date.now() });
+    tmT = setTimeout(() => {
+      if (buzz.winner !== id) return;
+      tmId = null; tmT = null;
+      set(R("timer"), { id, secs, tok: Date.now(), over: true });
+      set(R("buzz"), { open: true, out: { ...(buzz.out || {}), [id]: true } });
+      tmClr = setTimeout(() => set(R("timer"), null), 6000);
+    }, secs * 1000);
+  }
+  if (!buzz.winner && tmId) { clearTimeout(tmT); tmId = null; set(R("timer"), null); }
+}
 let lastWk = "";
 onValue(R("clue"), s => {
   clue = s.val(); showAns = false;

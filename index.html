@@ -3,8 +3,10 @@
  <main class="main">
   <h1>Game Show</h1>
   <div id="board" class="board"></div>
-  <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="cd" class="cd"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div></div>
+  <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="cd" class="cd"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div><div id="tn" class="tn" hidden></div></div>
  <div id="flash" class="flash"></div>
+ <div id="to" class="to"><b>TIME OUT</b><small>Buzzer is open for other players</small></div>
+ <div class="small" style="position:fixed;left:16px;bottom:12px;opacity:.55;z-index:4">Room: <span id="rmv"></span></div>
  <div id="lb" class="lb"></div>
  </main>
  <button id="snd" class="bad" style="position:fixed;right:16px;bottom:16px;z-index:5">🔊 Click once to enable sound</button>
@@ -28,6 +30,7 @@ const TIME = {
   lbMove: 1000,       // names sliding to their new positions
   lbScore: 1400,      // score counting on the leaderboard
   lbHold: 5000,       // leaderboard stays after moving, then fades out
+  timeoutShow: 3500,  // how long the TIME OUT screen stays up
 };
 for (const [k, v] of Object.entries({ ov: TIME.overlay, pop: TIME.popIn, fade: TIME.fade, count: TIME.countStep, move: TIME.lbMove })) document.documentElement.style.setProperty("--t-" + k, v + "ms");
 // ==============================================================================
@@ -55,6 +58,8 @@ const SOUND = {
   tick: (up, p) => tone(up ? 500 + 900 * p : 1400 - 900 * p, 0, 0.06, "square", 0.09),
   swoosh: () => tone(200, 0, 0.6, "sine", 0.18, 1400),
   whoosh: () => tone(1000, 0, 0.45, "sawtooth", 0.07, 200),
+  timer: n => tone(n <= 3 ? 880 : 520, 0, 0.12, "square", n <= 3 ? 0.2 : 0.1),
+  timeout: () => { tone(180, 0, 1, "sawtooth", 0.33, 90); tone(130, 0, 1, "square", 0.2, 70); tone(900, 0, 0.25, "square", 0.12); },
 };
 function sfx(name, ...a) {
   if (!SFX.on) return;
@@ -83,6 +88,31 @@ onValue(R("clue"), s => { clue = s.val(); render(); });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
 onValue(R("media"), s => { media = s.val() || {}; render(); });
 onValue(R("start"), () => { if (firstStart) { firstStart = false; return; } sfx("start"); });
+$("rmv").textContent = room;
+
+// ----- answer timer (started by the host after a buzz) -----
+let tmLive = 0, firstTimer = true, toT = 0;
+function hideTimer() { $("tn").hidden = true; $("tn").className = "tn"; }
+function runTimer(secs, tok) {
+  const el = $("tn"); let n = secs; el.hidden = false; fit();
+  const step = () => {
+    if (tok !== tmLive || n === 0) return;
+    sfx("timer", n); el.textContent = n; el.className = "tn"; void el.offsetWidth; el.className = "tn go" + (n <= 3 ? " low" : "");
+    n--; setTimeout(step, 1000);
+  };
+  step();
+}
+function showTimeout() {
+  hideTimer(); sfx("timeout");
+  const o = $("to"); clearTimeout(toT); o.className = "to show";
+  toT = setTimeout(() => { o.className = "to out"; toT = setTimeout(() => { o.className = "to"; }, TIME.fade); }, TIME.timeoutShow);
+}
+onValue(R("timer"), s => {
+  const v = s.val(), tok = ++tmLive, first = firstTimer; firstTimer = false;
+  if (!v) return hideTimer();
+  if (v.over) { if (!first) showTimeout(); return; }
+  runTimer(v.secs, tok);
+});
 let firstRes = true, lastRes = null;
 onValue(R("result"), s => {
   const r = s.val();

@@ -119,3 +119,11 @@ textarea::placeholder{color:#b9b2e6}
 .item{font-size:calc(clamp(2rem,5vw,4.5rem) * var(--fs,1));white-space:pre-line}
 .items img{max-height:calc(55vh * var(--fs,1))}
 .overlay .status.big{font-size:calc(clamp(3.5rem,10vw,9rem) * var(--fs,1))}
+.tn{font-size:clamp(5rem,16vw,14rem);font-weight:800;line-height:1;color:#fff;text-shadow:0 0 60px #ec4899}
+.tn.low{color:#fb7185;text-shadow:0 0 70px #e11d48}
+.tn.go{animation:cd var(--t-count,1s) ease-out forwards}
+.to{position:fixed;inset:0;z-index:8;display:none;flex-direction:column;align-items:center;justify-content:center;gap:2vh;text-align:center;background:radial-gradient(circle at 50% 40%,#dc143c,#7f0a1f 78%);color:#fff}
+.to b{font-size:clamp(5rem,20vw,18rem);font-weight:800;letter-spacing:.04em;line-height:1;color:#fff;text-shadow:0 0 80px #000a}
+.to small{font-size:clamp(1.6rem,4vw,3.6rem);font-weight:600}
+.to.show{display:flex;animation:popin var(--t-pop,.55s) ease-out forwards}
+.to.out{display:flex;animation:fadeout var(--t-fade,.7s) ease forwards}

@@ -8,8 +8,9 @@ export const db = getDatabase(app);
 export const auth = getAuth(app);
 export { get, ref, set, push, remove, onValue, runTransaction, onAuthStateChanged, signInWithEmailAndPassword, signOut };
 
-let r = new URLSearchParams(location.search).get("room") || localStorage.getItem("room");
-if (!r) r = Math.random().toString(36).slice(2, 8);
+export const cleanRoom = x => String(x || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 20);
+// Everyone lands in the same room: the code in the link, else the last one used, else "main".
+const r = cleanRoom(new URLSearchParams(location.search).get("room") || localStorage.getItem("room")) || "main";
 localStorage.setItem("room", r);
 export const room = r;
 export const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

@@ -1,6 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>Buzzer</title><link rel="stylesheet" href="style.css"></head><body>
 <main class="wrap center">
  <h1>Buzzer</h1>
+ <p id="rmv" class="small"></p>
  <div id="join" class="card" hidden>
   <h2 id="jt">Enter your name</h2>
   <div id="jf" class="row" style="justify-content:center"><input id="nm" maxlength="20" placeholder="Your name"><button id="go">Join</button></div>
@@ -18,6 +19,7 @@
 <script type="module">
 import { db, ref, onValue, push, remove, runTransaction, room, esc } from "./common.js";
 const $ = id => document.getElementById(id);
+$("rmv").textContent = "Room: " + room;
 const key = "pid-" + room, rkey = "req-" + room;
 let players = {}, buzz = {}, clue = null, note = "";
 onValue(ref(db, `rooms/${room}/players`), s => { players = s.val() || {}; render(); });
