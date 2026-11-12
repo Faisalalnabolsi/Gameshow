@@ -19,9 +19,9 @@ import { db, ref, onValue, room, esc, norm, arr, worth } from "./common.js";
 // ===== TIMINGS (milliseconds): edit these numbers to tune the animations =====
 const TIME = {
   countStep: 1000,    // how long each number of the 3-2-1 countdown lasts
-  overlay: 500,       // clue panel fading in / out
-  popIn: 550,         // CORRECT/WRONG and leaderboard screens popping in
-  fade: 300,          // fade-out and the crossfade between screens
+  overlay: 700,       // clue panel fading in / out
+  popIn: 650,         // CORRECT/WRONG and leaderboard screens popping in
+  fade: 400,          // fade-out and the crossfade between screens
   resultHold0: 850,  // CORRECT/WRONG sits still before the score starts counting
   scoreCount: 1000,   // score counting up/down on the result screen
   pulses: 5,          // number of size pulses while the score counts
@@ -30,7 +30,7 @@ const TIME = {
   lbMove: 800,       // names sliding to their new positions
   lbScore: 1000,      // score counting on the leaderboard
   lbHold: 3000,       // leaderboard stays after moving, then fades out
-  timeoutShow: 2500,  // how long the TIME OUT screen stays up
+  timeoutShow: 3000,  // how long the TIME OUT screen stays up
 };
 for (const [k, v] of Object.entries({ ov: TIME.overlay, pop: TIME.popIn, fade: TIME.fade, count: TIME.countStep, move: TIME.lbMove })) document.documentElement.style.setProperty("--t-" + k, v + "ms");
 // ==============================================================================
