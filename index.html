@@ -67,6 +67,12 @@ function sfx(name, ...a) {
 // ==============================================================================
 let lastW = null, lastOpen = false, firstStart = true;
 let ovT = 0;
+// shrinks the clue text/images step by step until everything fits on the screen
+function fit() {
+  const ov = document.getElementById("overlay"); if (!ov || ov.hidden || counting) return;
+  let k = 1; ov.style.setProperty("--fs", k);
+  while (k > 0.25 && (ov.scrollHeight > ov.clientHeight + 1 || ov.scrollWidth > ov.clientWidth + 1)) { k = Math.round((k - 0.05) * 100) / 100; ov.style.setProperty("--fs", k); }
+}
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, au = null, sig = "", lastPlay = 0, media = {};
@@ -169,6 +175,7 @@ function render() {
     $("os").className = w ? "status big" : "status"; $("os").textContent = w ? w.name : buzz.open ? "Buzzers open!" : "Get ready…";
     $("overlay").classList.toggle("counting", counting);
     if (t) { if (!counting) items(); } else { $("oi").innerHTML = ""; sig = ""; }
+    fit();
   }
 
   const list = Object.entries(players).sort((a, b) => b[1].score - a[1].score || a[1].num - b[1].num);
@@ -190,4 +197,6 @@ function items() {
 }
 $("snd").onclick = () => { ctx().resume(); $("snd").hidden = true; $("mute").hidden = false; $("mute").textContent = SFX.on ? "🔊" : "🔇"; sfx("open"); };
 $("mute").onclick = () => { SFX.on = !SFX.on; localStorage.setItem("sfx", SFX.on ? "1" : "0"); $("mute").textContent = SFX.on ? "🔊" : "🔇"; if (SFX.on) sfx("open"); };
+addEventListener("resize", fit);
+$("oi").addEventListener("load", fit, true);
 </script></body></html>

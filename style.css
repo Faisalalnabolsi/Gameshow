@@ -107,3 +107,15 @@ option{color:#000}
 @keyframes ovin{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
 @keyframes ovout{to{opacity:0;transform:scale(1.03)}}
 @keyframes rise{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
+/* full-screen scenes: clue, result and leaderboard cover the whole page, centered */
+.overlay,.flash,.lb{position:fixed;inset:0;border-radius:0;border:0}
+.overlay{z-index:5}
+textarea{font:inherit;color:#fff;background:#ffffff14;border:1px solid #ffffff33;border-radius:14px;padding:10px 12px;outline:0;resize:vertical;min-height:44px}
+textarea:focus{border-color:#67e8f9}
+textarea::placeholder{color:#b9b2e6}
+.clue-row textarea{flex:1;min-width:140px}
+/* clue text and images scale with --fs, which the display shrinks until everything fits */
+.overlay .q{font-size:calc(clamp(2.2rem,6vw,5.5rem) * var(--fs,1));white-space:pre-line}
+.item{font-size:calc(clamp(2rem,5vw,4.5rem) * var(--fs,1));white-space:pre-line}
+.items img{max-height:calc(55vh * var(--fs,1))}
+.overlay .status.big{font-size:calc(clamp(3.5rem,10vw,9rem) * var(--fs,1))}
