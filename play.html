@@ -43,7 +43,7 @@ function render() {
   $("who").textContent = `${mine.name} · ${mine.score} pts`;
   $("clue").textContent = clue ? (clue.type === "tier"
     ? `${clue.cat} · clue ${clue.shown}/${clue.total}\n` + Object.values(clue.items || {}).map(i => i.type === "text" ? i.v : "👀 Check the big screen").join("\n")
-    : `${clue.cat} · ${clue.value}\n${clue.question}`) : "";
+    : `${clue.cat} · ${clue.value}\n${clue.question || (clue.items ? "👀 Check the big screen" : "")}`) : "";
   $("buzz").disabled = !can;
   $("msg").textContent = buzz.winner ? (buzz.winner === me ? "You buzzed first! 🎉" : `${players[buzz.winner]?.name || "Someone"} buzzed first`)
     : out ? "You're locked out this question" : buzz.open ? "GO!" : "Wait for the host…";

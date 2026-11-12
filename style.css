@@ -127,3 +127,4 @@ textarea::placeholder{color:#b9b2e6}
 .to small{font-size:clamp(1.6rem,4vw,3.6rem);font-weight:600}
 .to.show{display:flex;animation:popin var(--t-pop,.55s) ease-out forwards}
 .to.out{display:flex;animation:fadeout var(--t-fade,.7s) ease forwards}
+.clue-row input[data-f=media],.clue-row input[data-f=answer]{flex:1;min-width:140px}

@@ -41,7 +41,14 @@ function fill() {
 let upK = null;
 const shrink = f => new Promise((res, rej) => { const im = new Image(); im.onload = () => { const z = Math.min(1, 900 / Math.max(im.width, im.height)), cv = document.createElement("canvas"); cv.width = im.width * z; cv.height = im.height * z; cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); res(cv.toDataURL("image/jpeg", .75)); }; im.onerror = () => rej(new Error("Couldn't read that image.")); im.src = URL.createObjectURL(f); });
 const readAudio = f => new Promise((res, rej) => { if (f.size > 1.5e6) return rej(new Error("Audio is over 1.5 MB. Trim it, or paste a link instead.")); const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-const jeoHtml = (q, i, j) => `<div class="clue-row"><input type="number" data-c="${i}" data-q="${j}" data-f="value" value="${q.value}" style="width:90px"><textarea data-c="${i}" data-q="${j}" data-f="question" rows="2" placeholder="Clue shown to players (Enter = new line)">${esc(q.question)}</textarea><input data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">✕</button></div>`;
+const jeoHtml = (q, i, j) => {
+  const P = `data-c="${i}" data-q="${j}"`, ty = q.type || "text";
+  return `<div class="clue-row"><input type="number" ${P} data-f="value" value="${q.value}" style="width:90px">`
+    + `<select ${P} data-f="type">${["text", "image", "audio"].map(t => `<option ${t === ty ? "selected" : ""}>${t}</option>`).join("")}</select>`
+    + (ty === "text" ? "" : `<input ${P} data-f="media" value="${esc(q.media || "")}" placeholder="Paste a link / upload →"><button class="bad" data-up="${i}-${j}">Upload</button>`)
+    + `<textarea ${P} data-f="question" rows="2" placeholder="${ty === "text" ? "Clue shown to players (Enter = new line)" : "Optional text shown with it"}">${esc(q.question)}</textarea>`
+    + `<input ${P} data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">✕</button></div>`;
+};
 const levelHtml = (q, i, j) => `<div class="lvl"><div class="row"><b>Level ${j + 1}</b><input class="grow" data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">Remove level</button></div>`
   + q.items.map((it, k) => `<div class="clue-row"><select data-c="${i}" data-q="${j}" data-i="${k}" data-f="type">${["text", "image", "audio"].map(t => `<option ${t === it.type ? "selected" : ""}>${t}</option>`).join("")}</select>${it.type === "text" ? `<textarea data-c="${i}" data-q="${j}" data-i="${k}" data-f="v" rows="2" placeholder="Clue text (Enter = new line)">${esc(it.v)}</textarea>` : `<input data-c="${i}" data-q="${j}" data-i="${k}" data-f="v" value="${esc(it.v)}" placeholder="Paste a link / upload →">`}${it.type === "text" ? "" : `<button class="bad" data-up="${i}-${j}-${k}">Upload</button>`}<button class="bad" data-x="i${i}-${j}-${k}">✕</button></div>`).join("")
   + `<button class="bad" data-x="n${i}-${j}">+ Add clue</button></div>`;
@@ -75,13 +82,13 @@ $("cats").oninput = e => {
 };
 $("file").onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f || !upK) return;
-  const [i, j, k] = upK.split("-").map(Number), it = cur.categories[i].clues[j].items[k];
-  try { const data = it.type === "image" ? await shrink(f) : await readAudio(f); const m = push(ref(db, "library/media")); await set(m, { data, name: f.name }); it.v = "db:" + m.key; draw(); $("msg").textContent = "Uploaded. Press Save."; }
+  const [i, j, k] = upK.split("-").map(Number), cl = cur.categories[i].clues[j], it = k === undefined ? cl : cl.items[k], fld = k === undefined ? "media" : "v";
+  try { const data = it.type === "image" ? await shrink(f) : await readAudio(f); const m = push(ref(db, "library/media")); await set(m, { data, name: f.name }); it[fld] = "db:" + m.key; draw(); $("msg").textContent = "Uploaded. Press Save."; }
   catch (err) { alert(err.message || "Upload failed."); }
 };
 $("cats").onclick = e => {
   const u = e.target.dataset.up;
-  if (u) { upK = u; const [i, j, k] = u.split("-").map(Number); $("file").accept = cur.categories[i].clues[j].items[k].type === "audio" ? "audio/*" : "image/*"; $("file").click(); return; }
+  if (u) { upK = u; const [i, j, k] = u.split("-").map(Number), cl = cur.categories[i].clues[j]; $("file").accept = (k === undefined ? cl : cl.items[k]).type === "audio" ? "audio/*" : "image/*"; $("file").click(); return; }
   const x = e.target.dataset.x; if (!x) return;
   const n = x.slice(1).split("-").map(Number);
   if (x[0] === "c") cur.categories.splice(n[0], 1);
