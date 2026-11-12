@@ -19,6 +19,7 @@
 <div class="layout">
 <section class="card"><h2>Board</h2><div class="row"><select id="boards"></select><button id="load">Load board</button><a href="editor.html">Edit boards</a></div><div id="board" class="board"></div></section>
 <section class="card"><h2>Players</h2>
+ <div id="reqs"></div>
  <div class="row"><input id="name" placeholder="Player name"><button id="add">Add player</button><button id="reset" class="bad">New game</button></div>
  <div id="players"></div>
 </section>
@@ -63,6 +64,19 @@ onValue(R("clue"), s => {
   render();
 });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
+let reqs = {};
+onValue(R("requests"), s => {
+  reqs = s.val() || {};
+  $("reqs").innerHTML = Object.entries(reqs).filter(([, q]) => !q.status).map(([id, q]) =>
+    `<div class="p"><span class="n">${esc(q.name)} wants to join</span><button class="good" data-r="ok" data-id="${id}">Approve</button><button class="bad" data-r="no" data-id="${id}">Deny</button></div>`).join("");
+});
+$("reqs").onclick = e => {
+  const { r, id } = e.target.dataset, q = reqs[id]; if (!r || !q) return;
+  if (r === "ok") {
+    const num = Math.max(0, ...Object.values(players).map(p => p.num)) + 1, p = push(R("players"), { name: q.name, num, score: 0 });
+    set(R("requests/" + id), { ...q, status: "approved", pid: p.key });
+  } else set(R("requests/" + id), { ...q, status: "denied" });
+};
 
 const curClue = () => { if (!clue) return null; const [i, r] = clue.key.split("-"); return board.categories[i]?.clues[r]; };
 

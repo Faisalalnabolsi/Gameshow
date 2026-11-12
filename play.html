@@ -1,7 +1,12 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>Buzzer</title><link rel="stylesheet" href="style.css"></head><body>
 <main class="wrap center">
  <h1>Buzzer</h1>
- <div id="pick" class="card pick" hidden></div>
+ <div id="join" class="card" hidden>
+  <h2 id="jt">Enter your name</h2>
+  <div id="jf" class="row" style="justify-content:center"><input id="nm" maxlength="20" placeholder="Your name"><button id="go">Join</button></div>
+  <p id="jm" class="status"></p>
+  <details class="small"><summary>Already on the list? Rejoin</summary><div id="pick" class="pick"></div></details>
+ </div>
  <div id="game" hidden>
   <p id="who" class="status"></p>
   <p id="clue" class="clue"></p>
@@ -11,10 +16,10 @@
  </div>
 </main>
 <script type="module">
-import { db, ref, onValue, runTransaction, room, esc } from "./common.js";
+import { db, ref, onValue, push, remove, runTransaction, room, esc } from "./common.js";
 const $ = id => document.getElementById(id);
-const key = "pid-" + room;
-let players = {}, buzz = {}, clue = null;
+const key = "pid-" + room, rkey = "req-" + room;
+let players = {}, buzz = {}, clue = null, note = "";
 onValue(ref(db, `rooms/${room}/players`), s => { players = s.val() || {}; render(); });
 onValue(ref(db, `rooms/${room}/buzz`), s => { buzz = s.val() || {}; render(); });
 
@@ -23,21 +28,41 @@ onValue(ref(db, `rooms/${room}/clue`), s => { clue = s.val(); render(); });
 function render() {
   const me = localStorage.getItem(key);
   const mine = players[me];
-  $("pick").hidden = !!mine; $("game").hidden = !mine;
+  $("join").hidden = !!mine; $("game").hidden = !mine;
   if (!mine) {
-    $("pick").innerHTML = "<h2>Who are you?</h2>" + (Object.keys(players).length
-      ? Object.entries(players).sort((a, b) => a[1].num - b[1].num).map(([id, p]) => `<button data-id="${id}">#${p.num} ${esc(p.name)}</button>`).join("")
-      : "<p>Waiting for the host to add players…</p>");
+    const pending = !!localStorage.getItem(rkey);
+    $("jf").hidden = pending; $("jt").textContent = pending ? "Request sent" : "Enter your name";
+    $("jm").textContent = pending ? "Waiting for the host to approve you…" : note;
+    $("pick").innerHTML = Object.keys(players).length ? Object.entries(players).sort((a, b) => a[1].num - b[1].num).map(([id, p]) => `<button data-id="${id}">${esc(p.name)}</button>`).join("") : "<p>No players yet.</p>";
     return;
   }
   const out = buzz.out && buzz.out[me];
   const can = buzz.open && !buzz.winner && !out;
   $("who").textContent = `${mine.name} · ${mine.score} pts`;
-  $("clue").textContent = clue ? `${clue.cat} · ${clue.value}\n${clue.question}` : "";
+  $("clue").textContent = clue ? (clue.type === "tier"
+    ? `${clue.cat} · clue ${clue.shown}/${clue.total}\n` + Object.values(clue.items || {}).map(i => i.type === "text" ? i.v : "👀 Check the big screen").join("\n")
+    : `${clue.cat} · ${clue.value}\n${clue.question}`) : "";
   $("buzz").disabled = !can;
   $("msg").textContent = buzz.winner ? (buzz.winner === me ? "You buzzed first! 🎉" : `${players[buzz.winner]?.name || "Someone"} buzzed first`)
     : out ? "You're locked out this question" : buzz.open ? "GO!" : "Wait for the host…";
 }
+function watch() {
+  const id = localStorage.getItem(rkey); if (!id) return;
+  onValue(ref(db, `rooms/${room}/requests/${id}`), s => {
+    const v = s.val();
+    if (v?.status === "approved") { localStorage.setItem(key, v.pid); localStorage.removeItem(rkey); remove(ref(db, `rooms/${room}/requests/${id}`)); }
+    else if (v?.status === "denied") { localStorage.removeItem(rkey); remove(ref(db, `rooms/${room}/requests/${id}`)); note = "The host declined that request. You can try again."; }
+    else if (!v && localStorage.getItem(rkey) === id) localStorage.removeItem(rkey);
+    render();
+  });
+}
+$("go").onclick = () => {
+  const name = $("nm").value.trim().slice(0, 20); if (!name) return;
+  localStorage.setItem(rkey, push(ref(db, `rooms/${room}/requests`), { name, t: Date.now() }).key);
+  note = ""; watch(); render();
+};
+$("nm").onkeydown = e => { if (e.key === "Enter") $("go").click(); };
+watch();
 $("pick").onclick = e => { const id = e.target.dataset.id; if (id) { localStorage.setItem(key, id); render(); } };
 $("switch").onclick = () => { localStorage.removeItem(key); render(); };
 $("buzz").onclick = () => {
