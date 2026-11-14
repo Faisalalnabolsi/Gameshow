@@ -32,7 +32,7 @@ input::placeholder{color:#b9b2e6}
 .pick button{display:block;width:100%;margin:8px 0}
 [hidden]{display:none!important}
 .board{display:grid;gap:10px}
-.cat{font-weight:800;text-align:center;padding:12px 4px;font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;background:#ffffff1a;border:1px solid #ffffff2b;border-radius:14px;color:#67e8f9}
+.cat{font-weight:800;text-align:center;padding:12px 4px;font-size:clamp(1rem,2vw,2rem);letter-spacing:.06em;text-transform:uppercase;background:#ffffff1a;border:1px solid #ffffff2b;border-radius:14px;color:#67e8f9}
 .tile{display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;padding:22px 0;border-radius:14px;color:#fff;background:linear-gradient(135deg,#8b5cf6cc,#ec4899cc);box-shadow:0 6px 20px #8b5cf644,inset 0 1px #ffffff66}
 .tile:disabled,.tile.used{opacity:.18;cursor:default;box-shadow:none}
 .clue{font-size:1.2rem;font-weight:600;margin:8px 0;white-space:pre-line}
