@@ -29,7 +29,7 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script type="module">
-import { db, get, ref, set, push, remove, onValue, runTransaction, room, cleanRoom, esc, norm, arr, worth, auth, onAuthStateChanged, signInWithEmailAndPassword } from "./common.js";
+import { db, get, ref, set, push, remove, onValue, runTransaction, room, cleanRoom, esc, norm, arr, worth, auth, onAuthStateChanged, signInWithEmailAndPassword, tierHtml, audioHtml, bindAudio } from "./common.js";
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false, lib = {}, boardId = null, pvSig = "";
@@ -61,6 +61,7 @@ onValue(R("buzz"), s => { buzz = s.val() || {}; render(); watchTimer(); });
 
 // ----- rooms: every host window follows the same room -----
 $("rm").textContent = room;
+bindAudio($("pv"));
 $("chg").onclick = () => {
   const n = prompt("Room code (letters and numbers). Leave blank for a new random room:", room); if (n === null) return;
   location.href = "host.html?room=" + (cleanRoom(n) || Math.random().toString(36).slice(2, 7));
@@ -84,6 +85,7 @@ function watchTimer() {
     tmT = setTimeout(() => {
       if (buzz.winner !== id) return;
       tmId = null; tmT = null;
+      const d = pts(); result(false, -d, true); adjust(id, -d);   // time out counts as a wrong answer
       set(R("timer"), { id, secs, tok: Date.now(), over: true });
       set(R("buzz"), { open: true, out: { ...(buzz.out || {}), [id]: true } });
       tmClr = setTimeout(() => set(R("timer"), null), 6000);
@@ -125,9 +127,12 @@ function render() {
   $("next").hidden = !tier || !!clue.all; $("replay").hidden = !(tier || (clue && arr(clue.items).some(i => i.type === "audio")));
   const showPv = clue && arr(clue.items).length > 0;
   const psig = showPv ? clue.key + "|" + arr(clue.items).length : "";
-  if (psig !== pvSig) { pvSig = psig; $("pv").innerHTML = showPv ? arr(clue.items).map(i => i.v.startsWith("db:") ? `<div class="small">📎 uploaded ${i.type}</div>` : i.type === "image" ? `<img src="${esc(i.v)}" referrerpolicy="no-referrer" style="max-height:90px;border-radius:10px" alt="image failed to load">` : i.type === "audio" ? `<audio src="${esc(i.v)}" controls style="height:32px"></audio>` : "").join("") : ""; }
+  if (psig !== pvSig) { pvSig = psig; $("pv").innerHTML = showPv ? arr(clue.items).map(i => i.v.startsWith("db:") ? `<div class="small">📎 uploaded ${i.type}</div>` : i.type === "image" ? `<img src="${esc(i.v)}" referrerpolicy="no-referrer" style="max-height:90px;border-radius:10px" alt="image failed to load">` : i.type === "audio" ? audioHtml(i.v, true) : "").join("") : ""; }
   $("ans").textContent = clue ? (showAns ? "Answer: " + (curClue()?.answer || "?") : "👁 Tap to show answer") : "";
 
+  $("board").className = board.type === "tier" ? "board tiers" : "board";
+  if (board.type === "tier") $("board").innerHTML = tierHtml(board, used, true, !!clue);
+  else {
   const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
   let h = cats.map(c => `<div class="cat">${esc(c.name)}</div>`).join("");
   for (let r = 0; r < rows; r++) cats.forEach((c, i) => {
@@ -136,6 +141,7 @@ function render() {
   });
   $("board").style.gridTemplateColumns = `repeat(${cats.length || 1},1fr)`;
   $("board").innerHTML = h;
+  }
 
   $("players").innerHTML = Object.entries(players).sort((a, b) => a[1].num - b[1].num).map(([id, p]) =>
     `<div class="p ${id === buzz.winner ? "win" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span>
@@ -186,9 +192,9 @@ $("next").onclick = async () => { const all = arr(curClue()?.items).filter(i => 
 $("replay").onclick = () => clue && set(R("clue/play"), Date.now());
 $("skip").onclick = () => done(true);
 $("cancel").onclick = () => done(false);
-const result = (ok, d) => {
+const result = (ok, d, late) => {
   const w = buzz.winner, p = players[w];
-  set(R("result"), { t: Date.now(), ok, name: p?.name || "", id: w, from: p?.score || 0, to: (p?.score || 0) + d,
+  set(R("result"), { t: Date.now(), late: !!late, ok, name: p?.name || "", id: w, from: p?.score || 0, to: (p?.score || 0) + d,
     rows: Object.entries(players).map(([id, q]) => ({ id, num: q.num, name: q.name, from: q.score, to: q.score + (id === w ? d : 0) })) });
 };
 $("ok").onclick = () => { if (buzz.winner) { const d = pts(); result(true, d); adjust(buzz.winner, d); done(true); } };

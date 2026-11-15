@@ -17,3 +17,25 @@ export const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;",
 export const arr = x => Object.values(x || {});
 export const norm = b => ({ ...b, name: b.name || "Untitled", categories: arr(b.categories).map(c => ({ ...c, clues: arr(c.clues).map(q => ({ ...q, items: arr(q.items) })) })) });
 export const worth = (c, d) => c.type === "tier" && !c.all ? Math.round(c.value * Math.max(0.1, 1 - (d ?? 10) / 100 * ((c.shown || 1) - 1))) : c.value;
+
+export const audioHtml = (src, sm) => `<div class="aud${sm ? " sm" : ""}"><button class="pl" aria-label="Play"><svg viewBox="0 0 24 24"><path class="ip" d="M8 5v14l11-7z"/><path class="ia" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></button><audio src="${esc(src)}" preload="auto"></audio></div>`;
+export function bindAudio(root) {
+  root.addEventListener("click", e => {
+    const b = e.target.closest(".pl"); if (!b) return;
+    const a = b.parentElement.querySelector("audio");
+    if (a.paused) { root.querySelectorAll("audio").forEach(x => x !== a && x.pause()); a.play().catch(() => {}); } else a.pause();
+  });
+  const mark = (e, on) => e.target.closest?.(".aud")?.classList.toggle("playing", on);
+  root.addEventListener("play", e => mark(e, true), true);
+  root.addEventListener("pause", e => mark(e, false), true);
+  root.addEventListener("ended", e => mark(e, false), true);
+}
+export function tierHtml(b, used, host, lock) {
+  const n = b.categories.length;
+  return `<div class="ladder">` + b.categories.map((c, i) => {
+    const pts = c.points ?? c.clues[0]?.value ?? 0, w = n > 1 ? 62 + 38 * i / (n - 1) : 100;
+    return `<div class="rung" style="--w:${w}%"><div class="rt"><b>${esc(c.name)}</b><span>${pts} pts</span></div><div class="rn">`
+      + c.clues.map((q, r) => { const k = i + "-" + r, u = used[k], t = host ? "button" : "div"; return `<${t} class="node ${u ? "used" : ""}" ${host ? `data-k="${k}" ${u || lock ? "disabled" : ""}` : ""}>${u ? "✓" : r + 1}</${t}>`; }).join("")
+      + `</div></div>`;
+  }).join("") + `</div>`;
+}

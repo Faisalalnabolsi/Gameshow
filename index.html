@@ -14,7 +14,7 @@
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
 </div>
 <script type="module">
-import { db, ref, onValue, room, esc, norm, arr, worth } from "./common.js";
+import { db, ref, onValue, room, esc, norm, arr, worth, tierHtml, audioHtml, bindAudio } from "./common.js";
 
 // ===== TIMINGS (milliseconds): edit these numbers to tune the animations =====
 const TIME = {
@@ -119,7 +119,7 @@ onValue(R("result"), s => {
   if (firstRes) { firstRes = false; lastRes = r?.t; return; }
   if (!r || r.t === lastRes) return;
   lastRes = r.t;
-  runResult(r);
+  setTimeout(() => runResult(r), r.late ? TIME.timeoutShow + TIME.fade : 0);
 });
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -182,6 +182,9 @@ function render() {
   lastW = wid;
   if (buzz.open && !lastOpen) sfx("open");
   lastOpen = !!buzz.open;
+  $("board").className = board.type === "tier" ? "board tiers" : "board";
+  if (board.type === "tier") $("board").innerHTML = tierHtml(board, used, false, false);
+  else {
   const cats = board.categories, rows = Math.max(0, ...cats.map(c => c.clues.length));
   let h = cats.map(c => `<div class="cat">${esc(c.name)}</div>`).join("");
   for (let r = 0; r < rows; r++) cats.forEach((c, i) => {
@@ -190,6 +193,7 @@ function render() {
   });
   $("board").style.gridTemplateColumns = `repeat(${cats.length || 1},1fr)`;
   $("board").innerHTML = h;
+  }
 
   const ov = $("overlay");
   if (clue) { clearTimeout(ovT); ov.classList.remove("out"); ov.hidden = false; }
@@ -220,7 +224,7 @@ function items() {
   if (s !== sig) {
     if (sig) sfx("reveal");
     sig = s;
-    $("oi").innerHTML = its.map(i => i.type === "image" ? `<img src="${esc(src(i))}" referrerpolicy="no-referrer" alt="" onerror="this.outerHTML='<div class=item>⚠ Image failed to load</div>'">` : i.type === "audio" ? `<audio src="${esc(src(i))}" controls preload="auto"></audio>` : `<div class="item">${esc(i.v)}</div>`).join("");
+    $("oi").innerHTML = its.map(i => i.type === "image" ? `<img src="${esc(src(i))}" referrerpolicy="no-referrer" alt="" onerror="this.outerHTML='<div class=item>⚠ Image failed to load</div>'">` : i.type === "audio" ? audioHtml(src(i)) : `<div class="item">${esc(i.v)}</div>`).join("");
     if (clue.all ? auds().length : its[its.length - 1]?.type === "audio") play();
   }
   if (clue.play && clue.play !== lastPlay) { lastPlay = clue.play; play(); }
@@ -229,4 +233,5 @@ $("snd").onclick = () => { ctx().resume(); $("snd").hidden = true; $("mute").hid
 $("mute").onclick = () => { SFX.on = !SFX.on; localStorage.setItem("sfx", SFX.on ? "1" : "0"); $("mute").textContent = SFX.on ? "🔊" : "🔇"; if (SFX.on) sfx("open"); };
 addEventListener("resize", fit);
 $("oi").addEventListener("load", fit, true);
+bindAudio($("oi"));
 </script></body></html>
