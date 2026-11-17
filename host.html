@@ -12,7 +12,7 @@
   <div id="ans" class="small"></div>
   <div id="status" class="status">Locked</div>
   <div class="row"><button id="open">Open buzzers</button><button id="ok" class="good">Correct +</button><button id="bad" class="bad">Wrong −</button><button id="next">Next clue ▸</button><button id="replay" class="bad">🔊 Replay</button><button id="skip">Skip</button><button id="cancel" class="bad">Cancel</button></div>
-  <label class="small">Points (fills in from the clue, editable) <input id="val" type="number" value="200" step="100" style="width:100px"></label>
+  <label class="small">Reward (correct) <input id="val" type="number" value="200" step="50" style="width:100px"></label> <label class="small">Penalty (wrong) <input id="pen" type="number" value="200" step="50" style="width:100px"></label>
   <label class="small"><input id="auto" type="checkbox" checked> Open buzzers automatically when a clue is picked</label>
   <label class="small"><input id="tm" type="checkbox"> Answer timer after a buzz</label> <label class="small">Seconds <input id="tmv" type="number" value="10" min="1" max="300" style="width:80px"></label>
  </div>
@@ -58,7 +58,7 @@ $("load").onclick = async () => {
   const id = $("boards").value; if (!id) return;
   if (Object.keys(used).length && !confirm("Loading a board resets the tiles. Continue?")) return;
   const b = norm(lib[id]);
-  await set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, categories: b.categories.map(c => ({ name: c.name, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "" })) })) });
+  await set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, categories: b.categories.map(c => ({ name: c.name, points: c.points ?? null, penalty: c.penalty ?? c.points ?? null, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "" })) })) });
   set(R("boardId"), id); set(R("start"), Date.now()); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
 };
 onValue(R("players"), s => { players = s.val() || {}; render(); });
@@ -90,7 +90,7 @@ function watchTimer() {
     tmT = setTimeout(() => {
       if (buzz.winner !== id) return;
       tmId = null; tmT = null;
-      const d = pts(); result(false, -d, true); adjust(id, -d);   // time out counts as a wrong answer
+      const d = pen(); result(false, -d, true); adjust(id, -d);   // time out counts as a wrong answer
       set(R("timer"), { id, secs, tok: Date.now(), over: true });
       set(R("buzz"), { open: true, out: { ...(buzz.out || {}), [id]: true } });
       tmClr = setTimeout(() => set(R("timer"), null), 6000);
@@ -102,7 +102,7 @@ let lastWk = "";
 onValue(R("clue"), s => {
   clue = s.val(); showAns = false;
   const wk = clue ? clue.key + "|" + (clue.shown ?? 0) : "";
-  if (wk !== lastWk) { lastWk = wk; if (clue) $("val").value = worth(clue, board.decay); }
+  if (wk !== lastWk) { lastWk = wk; if (clue) { $("val").value = worth(clue, board.decay); $("pen").value = clue.penalty ?? clue.value; } }
   render();
 });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
@@ -174,6 +174,7 @@ function render() {
 
 const val = () => Number($("val").value) || 0;
 const pts = () => val();
+const pen = () => Number($("pen").value) || 0;
 $("auto").checked = localStorage.getItem("auto") !== "0";
 $("auto").onchange = () => localStorage.setItem("auto", $("auto").checked ? "1" : "0");
 const adjust = (id, d) => runTransaction(R(`players/${id}/score`), v => (v || 0) + d);
@@ -185,7 +186,7 @@ $("board").onclick = async e => {
   const [i, r] = k.split("-"), c = board.categories[i], q = c.clues[r];
   set(R("buzz"), { open: false });
   if ($("auto").checked) setTimeout(() => { if (clue && clue.key === k && !buzz.winner) set(R("buzz"), { open: true }); }, 3300);
-  if (board.type === "tier") { const it = arr(q.items).filter(x => x.v?.trim()); const n = board.allAtOnce ? it.length : Math.min(1, it.length); await pub(it.slice(0, n)); set(R("clue"), { key: k, cat: c.name, value: c.points, type: "tier", all: !!board.allAtOnce, shown: n, total: it.length, items: it.slice(0, n) }); }
+  if (board.type === "tier") { const it = arr(q.items).filter(x => x.v?.trim()); const n = board.allAtOnce ? it.length : Math.min(1, it.length); await pub(it.slice(0, n)); set(R("clue"), { key: k, cat: c.name, value: c.points, penalty: c.penalty ?? c.points, type: "tier", all: !!board.allAtOnce, shown: n, total: it.length, items: it.slice(0, n) }); }
   else {
     const its = (q.type === "image" || q.type === "audio") && q.media?.trim() ? [{ type: q.type, v: q.media.trim() }] : [];
     await pub(its);
@@ -224,7 +225,7 @@ const result = (ok, d, late) => {
 $("ok").onclick = () => { if (buzz.winner) { const d = pts(); result(true, d); adjust(buzz.winner, d); done(true); } };
 $("bad").onclick = () => {
   if (!buzz.winner) return;
-  const d = pts(); result(false, -d); adjust(buzz.winner, -d);
+  const d = pen(); result(false, -d); adjust(buzz.winner, -d);
   set(R("buzz"), { open: true, out: { ...(buzz.out || {}), [buzz.winner]: true } });
 };
 </script></body></html>

@@ -13,7 +13,7 @@
   <div class="card row"><input id="bn" class="grow" placeholder="Board name"><label id="dcw" class="small" hidden>Points lost per extra clue (%) <input id="dc" type="number" min="0" max="90" style="width:80px"></label><label id="aaw" class="small" hidden><input id="aa" type="checkbox"> Show all clues at once</label><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
   <div id="cats"></div>
   <input id="file" type="file" hidden>
-  <button id="addcat">+ Add category</button>
+  <button id="cola" class="bad">Collapse all</button><button id="expa" class="bad">Expand all</button> <button id="addcat">+ Add category</button>
  </div>
 </div>
 </main>
@@ -41,7 +41,7 @@ function fill() {
 let upK = null;
 const shrink = f => new Promise((res, rej) => { const im = new Image(); im.onload = () => { const z = Math.min(1, 900 / Math.max(im.width, im.height)), cv = document.createElement("canvas"); cv.width = im.width * z; cv.height = im.height * z; cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); res(cv.toDataURL("image/jpeg", .75)); }; im.onerror = () => rej(new Error("Couldn't read that image.")); im.src = URL.createObjectURL(f); });
 const readAudio = f => new Promise((res, rej) => { if (f.size > 1.5e6) return rej(new Error("Audio is over 1.5 MB. Trim it, or paste a link instead.")); const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-const jeoHtml = (q, i, j) => {
+const jeoFull = (q, i, j) => {
   const P = `data-c="${i}" data-q="${j}"`, ty = q.type || "text";
   return `<div class="clue-row"><input type="number" ${P} data-f="value" value="${q.value}" style="width:90px">`
     + `<select ${P} data-f="type">${["text", "image", "audio"].map(t => `<option ${t === ty ? "selected" : ""}>${t}</option>`).join("")}</select>`
@@ -49,16 +49,32 @@ const jeoHtml = (q, i, j) => {
     + `<textarea ${P} data-f="question" rows="2" placeholder="${ty === "text" ? "Clue shown to players (Enter = new line)" : "Optional text shown with it"}">${esc(q.question)}</textarea>`
     + `<input ${P} data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">✕</button></div>`;
 };
-const levelHtml = (q, i, j) => `<div class="lvl"><div class="row"><b>Level ${j + 1}</b><input class="grow" data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">Remove level</button></div>`
+const levelFull = (q, i, j) => `<div class="lvl"><div class="row"><b>Level ${j + 1}</b><input class="grow" data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">Remove level</button></div>`
   + q.items.map((it, k) => `<div class="clue-row"><select data-c="${i}" data-q="${j}" data-i="${k}" data-f="type">${["text", "image", "audio"].map(t => `<option ${t === it.type ? "selected" : ""}>${t}</option>`).join("")}</select>${it.type === "text" ? `<textarea data-c="${i}" data-q="${j}" data-i="${k}" data-f="v" rows="2" placeholder="Clue text (Enter = new line)">${esc(it.v)}</textarea>` : `<input data-c="${i}" data-q="${j}" data-i="${k}" data-f="v" value="${esc(it.v)}" placeholder="Paste a link / upload →">`}${it.type === "text" ? "" : `<button class="bad" data-up="${i}-${j}-${k}">Upload</button>`}<button class="bad" data-x="i${i}-${j}-${k}">✕</button></div>`).join("")
   + `<button class="bad" data-x="n${i}-${j}">+ Add clue</button></div>`;
+// ----- collapsing + drag handles -----
+const folded = new WeakSet();
+const objOf = k => { const [a, b] = k.slice(1).split("."); return b === undefined ? cur.categories[a] : cur.categories[a].clues[b]; };
+const fold = k => folded.has(objOf(k));
+const HD = `<span class="dh" draggable="true" title="Drag to reorder">⠿</span>`;
+const TG = k => `<button class="bad tg" data-tg="${k}" title="Collapse / expand">${fold(k) ? "▸" : "▾"}</button>`;
+const jeoHtml = (q, i, j) => {
+  const K = `c${i}.${j}`, ty = q.type || "text";
+  if (fold(K)) return `<div class="clue-row sum" data-dl="c${i}" data-di="${j}">${HD}${TG(K)}<b>${q.value}</b><span class="n">${esc((q.question || q.media || "(empty)").replace(/\n/g, " ").slice(0, 70))}${ty === "text" ? "" : " · " + ty}</span><button class="bad" data-x="q${i}-${j}">✕</button></div>`;
+  return jeoFull(q, i, j).replace('<div class="clue-row">', `<div class="clue-row" data-dl="c${i}" data-di="${j}">${HD}${TG(K)}`);
+};
+const levelHtml = (q, i, j) => {
+  const K = `c${i}.${j}`;
+  if (fold(K)) return `<div class="lvl" data-dl="c${i}" data-di="${j}"><div class="row sum">${HD}${TG(K)}<b>Level ${j + 1}</b><span class="n">${esc(q.answer || "(no answer yet)")} · ${q.items.length} clue(s)</span><button class="bad" data-x="q${i}-${j}">✕</button></div></div>`;
+  return levelFull(q, i, j).replace('<div class="lvl"><div class="row"><b>', `<div class="lvl" data-dl="c${i}" data-di="${j}"><div class="row">${HD}${TG(K)}<b>`);
+};
 function draw() {
   $("ed").hidden = !cur; if (!cur) return;
   const T = cur.type === "tier";
   $("bn").value = cur.name; $("dcw").hidden = !T; $("aaw").hidden = !T; $("aa").checked = !!cur.allAtOnce; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
-  $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card"><div class="row"><input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="${T ? "Tier name (e.g. Easy)" : "Category name"}">${T ? `<input type="number" data-c="${i}" data-f="points" value="${c.points ?? 100}" style="width:100px" title="Points">` : ""}<button class="bad" data-x="c${i}">Remove</button></div>`
-    + c.clues.map((q, j) => T ? levelHtml(q, i, j) : jeoHtml(q, i, j)).join("")
-    + `<button data-x="a${i}">+ Add ${T ? "level" : "clue"}</button></div>`).join("");
+  $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card" data-dl="c" data-di="${i}"><div class="row">${HD}${TG("c" + i)}<input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="${T ? "Tier name (e.g. Easy)" : "Category name"}">${T ? `<label class="small">+</label><input type="number" data-c="${i}" data-f="points" value="${c.points ?? 100}" style="width:90px" title="Points for a correct answer"><label class="small">−</label><input type="number" data-c="${i}" data-f="penalty" value="${c.penalty ?? c.points ?? 100}" style="width:90px" title="Points lost for a wrong answer">` : ""}<button class="bad" data-x="c${i}">Remove</button></div>`
+    + (fold("c" + i) ? "</div>" : c.clues.map((q, j) => T ? levelHtml(q, i, j) : jeoHtml(q, i, j)).join("")
+    + `<button data-x="a${i}">+ Add ${T ? "level" : "clue"}</button></div>`)).join("");
 }
 async function add(b) {
   const n = push(ref(db, "library/boards")); await set(n, b);
@@ -78,7 +94,7 @@ $("addcat").onclick = () => { const n = cur.categories.length; cur.categories.pu
 $("cats").oninput = e => {
   const d = e.target.dataset; if (!d.f) return;
   const c = cur.categories[d.c], t = d.i !== undefined ? c.clues[d.q].items[d.i] : d.q === undefined ? c : c.clues[d.q];
-  t[d.f] = ["value", "points"].includes(d.f) ? Number(e.target.value) || 0 : e.target.value; $("msg").textContent = ""; if (d.f === "type") draw();
+  t[d.f] = ["value", "points", "penalty"].includes(d.f) ? Number(e.target.value) || 0 : e.target.value; $("msg").textContent = ""; if (d.f === "type") draw();
 };
 $("file").onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f || !upK) return;
@@ -86,7 +102,27 @@ $("file").onchange = async e => {
   try { const data = it.type === "image" ? await shrink(f) : await readAudio(f); const m = push(ref(db, "library/media")); await set(m, { data, name: f.name }); it[fld] = "db:" + m.key; draw(); $("msg").textContent = "Uploaded. Press Save."; }
   catch (err) { alert(err.message || "Upload failed."); }
 };
+$("cola").onclick = () => { cur.categories.forEach(c => c.clues.forEach(q => folded.add(q))); draw(); };
+$("expa").onclick = () => { cur.categories.forEach(c => { folded.delete(c); c.clues.forEach(q => folded.delete(q)); }); draw(); };
+let drag = null;
+const listOf = k => k === "c" ? cur.categories : cur.categories[Number(k.slice(1))].clues;
+$("cats").addEventListener("dragstart", e => {
+  const h = e.target.closest?.(".dh"); if (!h) return;
+  const row = h.closest("[data-dl]"); drag = { l: row.dataset.dl, i: Number(row.dataset.di) };
+  e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", "x"); e.dataTransfer.setDragImage(row, 20, 20); row.classList.add("dragging");
+});
+$("cats").addEventListener("dragover", e => {
+  if (!drag) return; const row = e.target.closest?.(`[data-dl="${drag.l}"]`); if (!row) return;
+  e.preventDefault(); $("cats").querySelectorAll(".over").forEach(x => x.classList.remove("over")); row.classList.add("over");
+});
+$("cats").addEventListener("drop", e => {
+  if (!drag) return; const row = e.target.closest?.(`[data-dl="${drag.l}"]`); if (!row) return;
+  e.preventDefault(); const a = listOf(drag.l), [m] = a.splice(drag.i, 1); a.splice(Number(row.dataset.di), 0, m); drag = null; $("msg").textContent = ""; draw();
+});
+$("cats").addEventListener("dragend", () => { drag = null; $("cats").querySelectorAll(".dragging,.over").forEach(x => x.classList.remove("dragging", "over")); });
 $("cats").onclick = e => {
+  const tg = e.target.dataset.tg;
+  if (tg) { const o = objOf(tg); folded.has(o) ? folded.delete(o) : folded.add(o); draw(); return; }
   const u = e.target.dataset.up;
   if (u) { upK = u; const [i, j, k] = u.split("-").map(Number), cl = cur.categories[i].clues[j]; $("file").accept = (k === undefined ? cl : cl.items[k]).type === "audio" ? "audio/*" : "image/*"; $("file").click(); return; }
   const x = e.target.dataset.x; if (!x) return;

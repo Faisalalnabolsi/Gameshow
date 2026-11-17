@@ -166,3 +166,10 @@ textarea::placeholder{color:#b9b2e6}
 .win em{font-style:normal;font-size:clamp(1.2rem,2.8vw,2.4rem);color:#67e8f9}
 .cf{position:absolute;top:-5vh;width:10px;height:18px;opacity:.9;animation:cfall linear infinite}
 @keyframes cfall{to{transform:translateY(112vh) rotate(720deg)}}
+.dh{cursor:grab;padding:0 8px;font-size:1.3rem;color:#c4b5fd;user-select:none}
+.dh:active{cursor:grabbing}
+.tg{padding:4px 12px}
+.dragging{opacity:.35}
+.over{outline:2px dashed #67e8f9;outline-offset:3px}
+.sum{align-items:center}
+.sum .n{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
