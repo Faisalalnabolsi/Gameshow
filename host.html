@@ -17,11 +17,16 @@
   <label class="small"><input id="tm" type="checkbox"> Answer timer after a buzz</label> <label class="small">Seconds <input id="tmv" type="number" value="10" min="1" max="300" style="width:80px"></label>
  </div>
 </section>
+<details class="card"><summary><b>Teams</b></summary>
+ <label class="small"><input id="teamson" type="checkbox"> Enable teams (players pick a team when they join)</label>
+ <div id="teamlist"></div>
+ <div class="row"><input id="tname" placeholder="Team name"><button id="tadd">Add team</button></div>
+</details>
 <div class="layout">
 <section class="card"><h2>Board</h2><div class="row"><select id="boards"></select><button id="load">Load board</button><a href="editor.html">Edit boards</a></div><div id="board" class="board"></div></section>
 <section class="card"><h2>Players</h2>
  <div id="reqs"></div>
- <div class="row"><input id="name" placeholder="Player name"><button id="add">Add player</button><button id="reset" class="bad">New game</button></div>
+ <div class="row"><input id="name" placeholder="Player name"><select id="pteam" hidden></select><button id="add">Add player</button><button id="reset" class="bad">New game</button></div>
  <div id="players"></div>
 </section>
 </div>
@@ -29,7 +34,7 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script type="module">
-import { db, get, ref, set, push, remove, onValue, runTransaction, room, cleanRoom, esc, norm, arr, worth, auth, onAuthStateChanged, signInWithEmailAndPassword, tierHtml, audioHtml, bindAudio } from "./common.js";
+import { db, get, ref, set, push, remove, onValue, runTransaction, room, cleanRoom, esc, norm, arr, worth, auth, onAuthStateChanged, signInWithEmailAndPassword, tierHtml, audioHtml, bindAudio, dot, TEAM_COLORS } from "./common.js";
 const $ = id => document.getElementById(id);
 const R = p => ref(db, `rooms/${room}/${p}`);
 let players = {}, buzz = {}, clue = null, used = {}, board = { categories: [] }, showAns = false, lib = {}, boardId = null, pvSig = "";
@@ -101,16 +106,35 @@ onValue(R("clue"), s => {
   render();
 });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
+let teams = {}, teamsOn = false;
+const tdot = p => teamsOn ? dot(teams, p) : "";
+const fillTeams = () => {
+  $("teamson").checked = teamsOn;
+  $("teamlist").innerHTML = Object.entries(teams).map(([id, t]) => `<div class="p"><i class="dot big" data-r="col" data-id="${id}" style="background:${esc(t.color)};cursor:pointer" title="Click to change the color"></i><input class="grow" data-r="tn" data-id="${id}" value="${esc(t.name)}"><button class="bad" data-r="td" data-id="${id}">✕</button></div>`).join("");
+  $("pteam").hidden = !teamsOn;
+  $("pteam").innerHTML = '<option value="">No team</option>' + Object.entries(teams).map(([id, t]) => `<option value="${id}">${esc(t.name)}</option>`).join("");
+  render();
+};
+onValue(R("teams"), s => { teams = s.val() || {}; fillTeams(); });
+onValue(R("teamsOn"), s => { teamsOn = !!s.val(); fillTeams(); });
+$("teamson").onchange = () => set(R("teamsOn"), $("teamson").checked);
+$("tadd").onclick = () => { const name = $("tname").value.trim(); if (!name) return; push(R("teams"), { name, color: TEAM_COLORS[Object.keys(teams).length % TEAM_COLORS.length] }); $("tname").value = ""; };
+$("teamlist").onclick = e => {
+  const { r, id } = e.target.dataset; if (!r || !teams[id]) return;
+  if (r === "col") set(R(`teams/${id}/color`), TEAM_COLORS[(TEAM_COLORS.indexOf(teams[id].color) + 1) % TEAM_COLORS.length]);
+  if (r === "td" && confirm(`Remove team "${teams[id].name}"?`)) remove(R("teams/" + id));
+};
+$("teamlist").onchange = e => { const { r, id } = e.target.dataset; if (r === "tn" && e.target.value.trim()) set(R(`teams/${id}/name`), e.target.value.trim()); };
 let reqs = {};
 onValue(R("requests"), s => {
   reqs = s.val() || {};
   $("reqs").innerHTML = Object.entries(reqs).filter(([, q]) => !q.status).map(([id, q]) =>
-    `<div class="p"><span class="n">${esc(q.name)} wants to join</span><button class="good" data-r="ok" data-id="${id}">Approve</button><button class="bad" data-r="no" data-id="${id}">Deny</button></div>`).join("");
+    `<div class="p"><span class="n">${tdot({ team: q.team })}${esc(q.name)} wants to join</span><button class="good" data-r="ok" data-id="${id}">Approve</button><button class="bad" data-r="no" data-id="${id}">Deny</button></div>`).join("");
 });
 $("reqs").onclick = e => {
   const { r, id } = e.target.dataset, q = reqs[id]; if (!r || !q) return;
   if (r === "ok") {
-    const num = Math.max(0, ...Object.values(players).map(p => p.num)) + 1, p = push(R("players"), { name: q.name, num, score: 0 });
+    const num = Math.max(0, ...Object.values(players).map(p => p.num)) + 1, p = push(R("players"), { name: q.name, num, score: 0, team: q.team || null });
     set(R("requests/" + id), { ...q, status: "approved", pid: p.key });
   } else set(R("requests/" + id), { ...q, status: "denied" });
 };
@@ -119,7 +143,7 @@ const curClue = () => { if (!clue) return null; const [i, r] = clue.key.split("-
 
 function render() {
   const w = buzz.winner && players[buzz.winner];
-  $("status").textContent = w ? `${w.name} buzzed first!` : buzz.open ? "Buzzers open…" : "Locked";
+  $("status").innerHTML = w ? `${tdot(w)}${esc(w.name)} buzzed first!` : buzz.open ? "Buzzers open…" : "Locked";
   const tier = clue && clue.type === "tier";
   $("clue").textContent = !clue ? "Pick a tile on the board" : tier
     ? `${clue.cat} · worth ${worth(clue, board.decay)} · clue ${clue.shown}/${clue.total}\n` + arr(clue.items).filter(i => i.type === "text").map(i => i.v).join("\n")
@@ -144,7 +168,7 @@ function render() {
   }
 
   $("players").innerHTML = Object.entries(players).sort((a, b) => a[1].num - b[1].num).map(([id, p]) =>
-    `<div class="p ${id === buzz.winner ? "win" : ""}"><b>#${p.num}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span>
+    `<div class="p ${id === buzz.winner ? "win" : ""}"><b>#${p.num}</b><span class="n">${tdot(p)}${esc(p.name)}</span><span class="s">${p.score}</span>
      <button data-a="-" data-id="${id}">−</button><button data-a="+" data-id="${id}">+</button><button data-a="x" data-id="${id}" class="bad">✕</button></div>`).join("");
 }
 
@@ -173,7 +197,7 @@ $("ans").onclick = () => { showAns = !showAns; render(); };
 $("add").onclick = () => {
   const name = $("name").value.trim(); if (!name) return;
   const num = Math.max(0, ...Object.values(players).map(p => p.num)) + 1;
-  push(R("players"), { name, num, score: 0 }); $("name").value = "";
+  push(R("players"), { name, num, score: 0, team: teamsOn ? ($("pteam").value || null) : null }); $("name").value = "";
 };
 $("name").onkeydown = e => { if (e.key === "Enter") $("add").click(); };
 $("players").onclick = e => {

@@ -4,7 +4,7 @@
  <p id="rmv" class="small"></p>
  <div id="join" class="card" hidden>
   <h2 id="jt">Enter your name</h2>
-  <div id="jf" class="row" style="justify-content:center"><input id="nm" maxlength="20" placeholder="Your name"><button id="go">Join</button></div>
+  <div id="jf" class="row" style="justify-content:center"><input id="nm" maxlength="20" placeholder="Your name"><select id="tsel" hidden></select><button id="go">Join</button></div>
   <p id="jm" class="status"></p>
   <details class="small"><summary>Already on the list? Rejoin</summary><div id="pick" class="pick"></div></details>
  </div>
@@ -17,11 +17,11 @@
  </div>
 </main>
 <script type="module">
-import { db, ref, onValue, push, remove, runTransaction, room, esc } from "./common.js";
+import { db, ref, onValue, push, remove, runTransaction, room, esc, dot } from "./common.js";
 const $ = id => document.getElementById(id);
 $("rmv").textContent = "Room: " + room;
 const key = "pid-" + room, rkey = "req-" + room;
-let players = {}, buzz = {}, clue = null, note = "";
+let players = {}, buzz = {}, clue = null, note = "", teams = {}, teamsOn = false;
 onValue(ref(db, `rooms/${room}/players`), s => { players = s.val() || {}; render(); });
 onValue(ref(db, `rooms/${room}/buzz`), s => { buzz = s.val() || {}; render(); });
 
@@ -40,12 +40,21 @@ function render() {
   }
   const out = buzz.out && buzz.out[me];
   const can = buzz.open && !buzz.winner && !out;
-  $("who").textContent = `${mine.name} · ${mine.score} pts`;
+  $("who").innerHTML = `${teamsOn ? dot(teams, mine) : ""}${esc(mine.name)} · ${mine.score} pts`;
   $("clue").textContent = clue ? "👀 Look at the big screen" : "";
   $("buzz").disabled = !can;
   $("msg").textContent = buzz.winner ? (buzz.winner === me ? "You buzzed first! 🎉" : `${players[buzz.winner]?.name || "Someone"} buzzed first`)
     : out ? "You're locked out this question" : buzz.open ? "GO!" : "Wait for the host…";
 }
+const fillT = () => {
+  const keep = $("tsel").value;
+  $("tsel").hidden = !(teamsOn && Object.keys(teams).length);
+  $("tsel").innerHTML = '<option value="">Choose your team</option>' + Object.entries(teams).map(([id, t]) => `<option value="${id}">${esc(t.name)}</option>`).join("");
+  $("tsel").value = teams[keep] ? keep : "";
+  render();
+};
+onValue(ref(db, `rooms/${room}/teams`), s => { teams = s.val() || {}; fillT(); });
+onValue(ref(db, `rooms/${room}/teamsOn`), s => { teamsOn = !!s.val(); fillT(); });
 function watch() {
   const id = localStorage.getItem(rkey); if (!id) return;
   onValue(ref(db, `rooms/${room}/requests/${id}`), s => {
@@ -58,7 +67,8 @@ function watch() {
 }
 $("go").onclick = () => {
   const name = $("nm").value.trim().slice(0, 20); if (!name) return;
-  localStorage.setItem(rkey, push(ref(db, `rooms/${room}/requests`), { name, t: Date.now() }).key);
+  if (!$("tsel").hidden && !$("tsel").value) { note = "Pick your team first."; render(); return; }
+  localStorage.setItem(rkey, push(ref(db, `rooms/${room}/requests`), { name, team: $("tsel").value || null, t: Date.now() }).key);
   note = ""; watch(); render();
 };
 $("nm").onkeydown = e => { if (e.key === "Enter") $("go").click(); };

@@ -33,9 +33,12 @@ export function bindAudio(root) {
 export function tierHtml(b, used, host, lock) {
   const n = b.categories.length;
   return `<div class="ladder">` + b.categories.map((c, i) => {
-    const pts = c.points ?? c.clues[0]?.value ?? 0, w = n > 1 ? 62 + 38 * i / (n - 1) : 100;
+    const pts = c.points ?? c.clues[0]?.value ?? 0, w = 100;
     return `<div class="rung" style="--w:${w}%"><div class="rt"><b>${esc(c.name)}</b><span>${pts} pts</span></div><div class="rn">`
       + c.clues.map((q, r) => { const k = i + "-" + r, u = used[k], t = host ? "button" : "div"; return `<${t} class="node ${u ? "used" : ""}" ${host ? `data-k="${k}" ${u || lock ? "disabled" : ""}` : ""}>${u ? "✓" : r + 1}</${t}>`; }).join("")
       + `</div></div>`;
   }).join("") + `</div>`;
 }
+
+export const TEAM_COLORS = ["#22d3ee", "#f472b6", "#fbbf24", "#4ade80", "#a78bfa", "#fb923c", "#f87171", "#60a5fa"];
+export const dot = (teams, p) => { const t = teams?.[p?.team]; return t ? `<i class="dot" style="background:${esc(t.color)}"></i>` : ""; };

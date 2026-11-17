@@ -14,7 +14,7 @@
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
 </div>
 <script type="module">
-import { db, ref, onValue, room, esc, norm, arr, worth, tierHtml, audioHtml, bindAudio } from "./common.js";
+import { db, ref, onValue, room, esc, norm, arr, worth, tierHtml, audioHtml, bindAudio, dot } from "./common.js";
 
 // ===== TIMINGS (milliseconds): edit these numbers to tune the animations =====
 const TIME = {
@@ -28,7 +28,6 @@ const TIME = {
   resultHold1: 2000,  // pause after the score finishes, before the leaderboard
   lbShow: 1500,       // leaderboard visible before the names start moving
   lbMove: 1000,       // names sliding to their new positions
-  lbScore: 1400,      // score counting on the leaderboard
   lbHold: 5000,       // leaderboard stays after moving, then fades out
   timeoutShow: 3500,  // how long the TIME OUT screen stays up
 };
@@ -87,6 +86,10 @@ onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
 onValue(R("clue"), s => { clue = s.val(); render(); });
 onValue(R("used"), s => { used = s.val() || {}; render(); });
 onValue(R("media"), s => { media = s.val() || {}; render(); });
+let teams = {}, teamsOn = false;
+const tdot = p => teamsOn ? dot(teams, p) : "";
+onValue(R("teams"), s => { teams = s.val() || {}; render(); });
+onValue(R("teamsOn"), s => { teamsOn = !!s.val(); render(); });
 onValue(R("start"), () => { if (firstStart) { firstStart = false; return; } sfx("start"); });
 $("rmv").textContent = room;
 
@@ -138,7 +141,7 @@ let resTok = 0;
 async function runResult(r) {
   const tok = ++resTok, live = () => tok === resTok, f = $("flash"), lb = $("lb"), c = r.ok ? "ok" : "no";
   lb.className = "lb"; f.className = "flash"; void f.offsetWidth;
-  f.innerHTML = `<b>${r.ok ? "CORRECT!" : "WRONG!"}</b><div class="who"><span class="nm">${esc(r.name)}</span><span class="sc ${c}">${r.from}</span></div>`;
+  f.innerHTML = `<b>${r.ok ? "CORRECT!" : "WRONG!"}</b><div class="who"><span class="nm">${tdot(players[r.id])}${esc(r.name)}</span><span class="sc ${c}">${r.from}</span></div>`;
   f.className = "flash show " + c; sfx(r.ok ? "correct" : "wrong");
   await sleep(TIME.resultHold0); if (!live()) return;
   await countTo(f.querySelector(".sc"), r.from, r.to, TIME.scoreCount, true); if (!live()) return;
@@ -146,7 +149,7 @@ async function runResult(r) {
 
   const rows = arr(r.rows), rank = k => [...rows].sort((a, b) => b[k] - a[k] || a.num - b.num).map(x => x.id), r0 = rank("from"), r1 = rank("to");
   lb.innerHTML = `<h2>Leaderboard</h2><div class="lbl" style="--n:${rows.length}">` + rows.map(x =>
-    `<div class="lbr" data-id="${x.id}" style="transform:translateY(calc(var(--rh) * ${r0.indexOf(x.id)}))"><span class="rk">${r0.indexOf(x.id) + 1}</span><span class="nm">${esc(x.name)}</span><span class="sc">${x.from}</span><span class="ar"></span></div>`).join("") + "</div>";
+    `<div class="lbr" data-id="${x.id}" style="transform:translateY(calc(var(--rh) * ${r0.indexOf(x.id)}))"><span class="rk">${r0.indexOf(x.id) + 1}</span><span class="nm">${tdot(players[x.id])}${esc(x.name)}</span><span class="sc">${x.to}</span><span class="ar"></span></div>`).join("") + "</div>";
   lb.className = "lb show"; f.className = "flash out " + c; sfx("swoosh");   // crossfade: leaderboard in while the result fades out
   await sleep(TIME.fade); if (!live()) return;
   f.className = "flash";
@@ -156,7 +159,7 @@ async function runResult(r) {
     const el = lb.querySelector(`[data-id="${x.id}"]`), a = r0.indexOf(x.id), b = r1.indexOf(x.id);
     el.style.transform = `translateY(calc(var(--rh) * ${b}))`;
     el.querySelector(".rk").textContent = b + 1;
-    if (x.id === r.id) { el.classList.add(c); countTo(el.querySelector(".sc"), x.from, x.to, TIME.lbScore, true); }
+    if (x.id === r.id) el.classList.add(c);
     if (a !== b) el.querySelector(".ar").innerHTML = `<span class="${b < a ? "up" : "dn"}">${b < a ? "▲" : "▼"} ${Math.abs(a - b)}</span>`;
   });
   await sleep(TIME.lbHold); if (!live()) return;
@@ -206,7 +209,7 @@ function render() {
     const sec = t ? `Level ${lvl} · worth ${worth(clue, board.decay)}` + (counting ? "" : ` · clue ${clue.shown}/${clue.total}`) : `${clue.value}`;
     $("oc").innerHTML = `<div class="h1">${esc(clue.cat)}</div><div class="h2">${esc(sec)}</div>`;
     $("oq").textContent = clue.question || "";
-    $("os").className = w ? "status big" : "status"; $("os").textContent = w ? w.name : buzz.open ? "Buzzers open!" : "Get ready…";
+    $("os").className = w ? "status big" : "status"; $("os").innerHTML = w ? tdot(w) + esc(w.name) : buzz.open ? "Buzzers open!" : "Get ready…";
     $("overlay").classList.toggle("counting", counting);
     if (t || arr(clue.items).length) { if (!counting) items(); } else { $("oi").innerHTML = ""; sig = ""; }
     fit();
@@ -214,7 +217,7 @@ function render() {
 
   const list = Object.entries(players).sort((a, b) => b[1].score - a[1].score || a[1].num - b[1].num);
   $("sb").innerHTML = list.length ? list.map(([id, p], i) =>
-    `<div class="sb ${id === buzz.winner ? "win" : ""} ${buzz.out && buzz.out[id] ? "out" : ""}"><b>${i + 1}</b><span class="n">${esc(p.name)}</span><span class="s">${p.score}</span></div>`).join("")
+    `<div class="sb ${id === buzz.winner ? "win" : ""} ${buzz.out && buzz.out[id] ? "out" : ""}"><b>${i + 1}</b><span class="n">${tdot(p)}${esc(p.name)}</span><span class="s">${p.score}</span></div>`).join("")
     : '<p class="small">Waiting for players…<br>Open this page from the host panel link.</p>';
 }
 const auds = () => [...$("oi").querySelectorAll("audio")];
