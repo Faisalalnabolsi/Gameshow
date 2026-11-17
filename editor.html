@@ -10,7 +10,7 @@
   <div class="row"><label class="small">Import JSON <input id="imp" type="file" accept=".json"></label><button id="exp" class="bad">Export</button><a href="host.html">← Host panel</a><button id="out" class="bad">Sign out</button></div>
  </div>
  <div id="ed" hidden>
-  <div class="card row"><input id="bn" class="grow" placeholder="Board name"><label id="dcw" class="small" hidden>Points lost per extra clue (%) <input id="dc" type="number" min="0" max="90" style="width:80px"></label><label id="aaw" class="small" hidden><input id="aa" type="checkbox"> Show all clues at once</label><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
+  <div class="card row"><input id="bn" class="grow" placeholder="Board name"><label id="dcw" class="small" hidden>Points lost per extra clue (%) <input id="dc" type="number" min="0" max="90" style="width:80px"></label><label id="aaw" class="small" hidden><input id="aa" type="checkbox"> Show all clues at once</label><label id="lnw" class="small" hidden><input id="ln" type="checkbox"> Show level names instead of numbers</label><button id="save" class="good">Save</button><span id="msg" class="small"></span></div>
   <div id="cats"></div>
   <input id="file" type="file" hidden>
   <button id="cola" class="bad">Collapse all</button><button id="expa" class="bad">Expand all</button> <button id="addcat">+ Add category</button>
@@ -49,7 +49,7 @@ const jeoFull = (q, i, j) => {
     + `<textarea ${P} data-f="question" rows="2" placeholder="${ty === "text" ? "Clue shown to players (Enter = new line)" : "Optional text shown with it"}">${esc(q.question)}</textarea>`
     + `<input ${P} data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">✕</button></div>`;
 };
-const levelFull = (q, i, j) => `<div class="lvl"><div class="row"><b>Level ${j + 1}</b><input class="grow" data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">Remove level</button></div>`
+const levelFull = (q, i, j) => `<div class="lvl"><div class="row"><b>Level ${j + 1}</b><textarea class="grow" data-c="${i}" data-q="${j}" data-f="name" rows="2" placeholder="Level name (optional, Enter = new line)">${esc(q.name || "")}</textarea><input class="grow" data-c="${i}" data-q="${j}" data-f="answer" value="${esc(q.answer)}" placeholder="Answer (host only)"><button class="bad" data-x="q${i}-${j}">Remove level</button></div>`
   + q.items.map((it, k) => `<div class="clue-row"><select data-c="${i}" data-q="${j}" data-i="${k}" data-f="type">${["text", "image", "audio"].map(t => `<option ${t === it.type ? "selected" : ""}>${t}</option>`).join("")}</select>${it.type === "text" ? `<textarea data-c="${i}" data-q="${j}" data-i="${k}" data-f="v" rows="2" placeholder="Clue text (Enter = new line)">${esc(it.v)}</textarea>` : `<input data-c="${i}" data-q="${j}" data-i="${k}" data-f="v" value="${esc(it.v)}" placeholder="Paste a link / upload →">`}${it.type === "text" ? "" : `<button class="bad" data-up="${i}-${j}-${k}">Upload</button>`}<button class="bad" data-x="i${i}-${j}-${k}">✕</button></div>`).join("")
   + `<button class="bad" data-x="n${i}-${j}">+ Add clue</button></div>`;
 // ----- collapsing + drag handles -----
@@ -71,8 +71,8 @@ const levelHtml = (q, i, j) => {
 function draw() {
   $("ed").hidden = !cur; if (!cur) return;
   const T = cur.type === "tier";
-  $("bn").value = cur.name; $("dcw").hidden = !T; $("aaw").hidden = !T; $("aa").checked = !!cur.allAtOnce; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
-  $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card" data-dl="c" data-di="${i}"><div class="row">${HD}${TG("c" + i)}<input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="${T ? "Tier name (e.g. Easy)" : "Category name"}">${T ? `<label class="small">+</label><input type="number" data-c="${i}" data-f="points" value="${c.points ?? 100}" style="width:90px" title="Points for a correct answer"><label class="small">−</label><input type="number" data-c="${i}" data-f="penalty" value="${c.penalty ?? c.points ?? 100}" style="width:90px" title="Points lost for a wrong answer">` : ""}<button class="bad" data-x="c${i}">Remove</button></div>`
+  $("bn").value = cur.name; $("dcw").hidden = !T; $("aaw").hidden = !T; $("lnw").hidden = !T; $("ln").checked = !!cur.levelNames; $("aa").checked = !!cur.allAtOnce; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
+  $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card" data-dl="c" data-di="${i}"><div class="row">${HD}${TG("c" + i)}${T ? `<textarea class="grow" data-c="${i}" data-f="name" rows="2" placeholder="Tier name (Enter = new line)">${esc(c.name)}</textarea>` : `<input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="Category name">`}${T ? `<label class="small">+</label><input type="number" data-c="${i}" data-f="points" value="${c.points ?? 100}" style="width:90px" title="Points for a correct answer"><label class="small">−</label><input type="number" data-c="${i}" data-f="penalty" value="${c.penalty ?? c.points ?? 100}" style="width:90px" title="Points lost for a wrong answer">` : ""}<button class="bad" data-x="c${i}">Remove</button></div>`
     + (fold("c" + i) ? "</div>" : c.clues.map((q, j) => T ? levelHtml(q, i, j) : jeoHtml(q, i, j)).join("")
     + `<button data-x="a${i}">+ Add ${T ? "level" : "clue"}</button></div>`)).join("");
 }
@@ -89,6 +89,7 @@ $("save").onclick = () => set(ref(db, `library/boards/${id}`), cur).then(() => $
 $("bn").oninput = e => { cur.name = e.target.value; $("msg").textContent = ""; };
 $("newt").onclick = () => add({ type: "tier", name: "New tier challenge", decay: 10, categories: [{ name: "Easy", points: 100, clues: [newLevel()] }] });
 $("aa").onchange = e => { cur.allAtOnce = e.target.checked; };
+$("ln").onchange = e => { cur.levelNames = e.target.checked; };
 $("dc").oninput = e => { cur.decay = Number(e.target.value) || 0; };
 $("addcat").onclick = () => { const n = cur.categories.length; cur.categories.push(cur.type === "tier" ? { name: "Tier " + (n + 1), points: (n + 1) * 100, clues: [newLevel()] } : { name: "New category", clues: [newClue(1)] }); draw(); };
 $("cats").oninput = e => {

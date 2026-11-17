@@ -31,11 +31,11 @@ export function bindAudio(root) {
   root.addEventListener("ended", e => mark(e, false), true);
 }
 export function tierHtml(b, used, host, lock) {
-  const n = b.categories.length;
-  return `<div class="ladder">` + b.categories.map((c, i) => {
-    const pts = c.points ?? c.clues[0]?.value ?? 0, w = 100;
-    return `<div class="rung" style="--w:${w}%"><div class="rt"><b>${esc(c.name)}</b><span>+${pts} / −${c.penalty ?? pts}</span></div><div class="rn">`
-      + c.clues.map((q, r) => { const k = i + "-" + r, u = used[k], t = host ? "button" : "div"; return `<${t} class="node ${u ? "used" : ""}" ${host ? `data-k="${k}" ${u || lock ? "disabled" : ""}` : ""}>${u ? "✓" : r + 1}</${t}>`; }).join("")
+  const cols = Math.max(1, ...b.categories.map(c => c.clues.length)), cap = !!b.levelNames;
+  return `<div class="ladder${cap ? " caps" : ""}" style="--cols:${cols}">` + b.categories.map((c, i) => {
+    const pts = c.points ?? c.clues[0]?.value ?? 0;
+    return `<div class="rung"><div class="rt"><b>${esc(c.name)}</b><span>+${pts} / −${c.penalty ?? pts}</span></div><div class="rn">`
+      + c.clues.map((q, r) => { const k = i + "-" + r, u = used[k], t = host ? "button" : "div", lab = cap && q.name ? esc(q.name) : r + 1; return `<${t} class="node${cap ? " cap" : ""}${u ? " used" : ""}" ${host ? `data-k="${k}" ${u || lock ? "disabled" : ""}` : ""}>${u ? "✓" : lab}</${t}>`; }).join("")
       + `</div></div>`;
   }).join("") + `</div>`;
 }

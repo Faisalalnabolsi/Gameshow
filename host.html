@@ -17,19 +17,20 @@
   <label class="small"><input id="tm" type="checkbox"> Answer timer after a buzz</label> <label class="small">Seconds <input id="tmv" type="number" value="10" min="1" max="300" style="width:80px"></label>
  </div>
 </section>
-<details class="card"><summary><b>Teams</b></summary>
+<section class="card"><h2>Players &amp; Teams</h2>
+<div class="pt">
+<div class="ptc"><h3>Teams</h3>
  <label class="small"><input id="teamson" type="checkbox"> Enable teams (players pick a team when they join)</label>
  <div id="teamlist"></div>
  <div class="row"><input id="tname" placeholder="Team name"><button id="tadd">Add team</button></div>
-</details>
-<div class="layout">
-<section class="card"><h2>Board</h2><div class="row"><select id="boards"></select><button id="load">Load board</button><a href="editor.html">Edit boards</a></div><div id="board" class="board"></div></section>
-<section class="card"><h2>Players</h2>
+</div>
+<div class="ptc"><h3>Players</h3>
  <div id="reqs"></div>
  <div class="row"><input id="name" placeholder="Player name"><select id="pteam" hidden></select><button id="add">Add player</button><button id="reset" class="bad">New game</button></div>
  <div id="players"></div>
-</section>
 </div>
+</div></section>
+<section class="card"><h2>Board</h2><div class="row"><select id="boards"></select><button id="load">Load board</button><a href="editor.html">Edit boards</a></div><div id="board" class="board"></div></section>
 </div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
@@ -58,7 +59,7 @@ $("load").onclick = async () => {
   const id = $("boards").value; if (!id) return;
   if (Object.keys(used).length && !confirm("Loading a board resets the tiles. Continue?")) return;
   const b = norm(lib[id]);
-  await set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, categories: b.categories.map(c => ({ name: c.name, points: c.points ?? null, penalty: c.penalty ?? c.points ?? null, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "" })) })) });
+  await set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, levelNames: !!b.levelNames, categories: b.categories.map(c => ({ name: c.name, points: c.points ?? null, penalty: c.penalty ?? c.points ?? null, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "", name: q.name ?? "" })) })) });
   set(R("boardId"), id); set(R("start"), Date.now()); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
 };
 onValue(R("players"), s => { players = s.val() || {}; render(); });

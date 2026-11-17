@@ -173,3 +173,16 @@ textarea::placeholder{color:#b9b2e6}
 .over{outline:2px dashed #67e8f9;outline-offset:3px}
 .sum{align-items:center}
 .sum .n{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pt{display:grid;grid-template-columns:minmax(240px,1fr) 2fr;gap:24px;align-items:start}
+.ptc h3{margin:0 0 8px;color:#c4b5fd;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase}
+@media(max-width:860px){.pt{grid-template-columns:1fr}}
+/* aligned ladder: every rung has the same label width and the same level columns */
+.ladder{--g:clamp(22px,3vw,46px);--nw:clamp(44px,6vw,84px)}
+.ladder.caps{--nw:clamp(110px,15vw,230px)}
+.rt{flex:0 0 22%;min-width:0;overflow-wrap:anywhere}
+.rt b{white-space:pre-line;display:block}
+.rn{display:grid;grid-template-columns:repeat(var(--cols),minmax(0,var(--nw)));column-gap:var(--g);justify-content:center;justify-items:stretch;align-items:center;flex:1;row-gap:0}
+.node{width:100%;aspect-ratio:1;margin:0!important}
+.node+.node::before{width:var(--g)}
+.node.cap{aspect-ratio:auto;height:clamp(44px,6vw,84px);border-radius:999px;padding:0 14px;font-size:clamp(.8rem,1.5vw,1.5rem);line-height:1.15;text-align:center;white-space:pre-line;overflow:hidden}
+.overlay .cl .h1,.overlay .cl .h2{white-space:pre-line}
