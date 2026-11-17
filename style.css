@@ -155,3 +155,14 @@ textarea::placeholder{color:#b9b2e6}
 .rung+.rung::before{top:calc(-1 * clamp(34px,6vh,68px));height:clamp(34px,6vh,68px)}
 .dot{display:inline-block;width:.62em;height:.62em;border-radius:50%;margin-right:.45em;box-shadow:0 0 0 2px #ffffff66}
 .dot.big{width:22px;height:22px;margin:0 6px 0 0}
+.lb{overflow:auto}
+.lbl{height:calc(var(--rh) * var(--c, var(--n)));margin-bottom:1.5vh}
+.lbh{width:min(100%,900px);text-align:left;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#c4b5fd;font-size:clamp(.9rem,1.6vw,1.4rem);margin:1vh 0 .6vh}
+.win{position:fixed;inset:0;z-index:9;display:none;flex-direction:column;align-items:center;justify-content:center;gap:2vh;text-align:center;overflow:hidden;padding:4vh 5vw;background:radial-gradient(circle at 50% 35%,#7c3aed,#1b0f4a 80%)}
+.win.show{display:flex;animation:popin var(--t-pop,.55s) ease-out forwards}
+.win small{letter-spacing:.3em;color:#fbbf24;font-size:clamp(1.4rem,3.5vw,3rem);font-weight:800}
+.win b{font-size:clamp(3.5rem,13vw,12rem);line-height:1.05;color:#fff;text-shadow:0 0 80px #ec4899}
+.win .ws{font-size:clamp(2rem,6vw,5rem);color:#fbbf24;font-weight:800}
+.win em{font-style:normal;font-size:clamp(1.2rem,2.8vw,2.4rem);color:#67e8f9}
+.cf{position:absolute;top:-5vh;width:10px;height:18px;opacity:.9;animation:cfall linear infinite}
+@keyframes cfall{to{transform:translateY(112vh) rotate(720deg)}}

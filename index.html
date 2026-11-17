@@ -5,6 +5,7 @@
   <div id="board" class="board"></div>
   <div id="overlay" class="overlay" hidden><div id="oc" class="cl"></div><div id="cd" class="cd"></div><div id="oq" class="q"></div><div id="oi" class="items"></div><div id="os" class="status"></div><div id="tn" class="tn" hidden></div></div>
  <div id="flash" class="flash"></div>
+ <div id="win" class="win"></div>
  <div id="to" class="to"><b>TIME OUT</b><small>Buzzer is open for other players</small></div>
  <div class="small" style="position:fixed;left:16px;bottom:12px;opacity:.55;z-index:4">Room: <span id="rmv"></span></div>
  <div id="lb" class="lb"></div>
@@ -59,6 +60,7 @@ const SOUND = {
   whoosh: () => tone(1000, 0, 0.45, "sawtooth", 0.07, 200),
   timer: n => tone(n <= 3 ? 880 : 520, 0, 0.12, "square", n <= 3 ? 0.2 : 0.1),
   timeout: () => { tone(180, 0, 1, "sawtooth", 0.33, 90); tone(130, 0, 1, "square", 0.2, 70); tone(900, 0, 0.25, "square", 0.12); },
+  win: () => { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, i * 0.14, 0.5, "triangle", 0.3)); tone(1568, 0.9, 1.4, "sine", 0.25); tone(784, 0.9, 1.4, "sawtooth", 0.08); },
 };
 function sfx(name, ...a) {
   if (!SFX.on) return;
@@ -84,13 +86,13 @@ onValue(R("board"), s => { board = s.val() ? norm(s.val()) : { categories: [] };
 onValue(R("players"), s => { players = s.val() || {}; render(); });
 onValue(R("buzz"), s => { buzz = s.val() || {}; render(); });
 onValue(R("clue"), s => { clue = s.val(); render(); });
-onValue(R("used"), s => { used = s.val() || {}; render(); });
+onValue(R("used"), s => { used = s.val() || {}; render(); if (!allDone()) { if (winOn) hideWinner(); } else setTimeout(maybeWinner, 1500); });
 onValue(R("media"), s => { media = s.val() || {}; render(); });
 let teams = {}, teamsOn = false;
 const tdot = p => teamsOn ? dot(teams, p) : "";
 onValue(R("teams"), s => { teams = s.val() || {}; render(); });
 onValue(R("teamsOn"), s => { teamsOn = !!s.val(); render(); });
-onValue(R("start"), () => { if (firstStart) { firstStart = false; return; } sfx("start"); });
+onValue(R("start"), () => { if (firstStart) { firstStart = false; return; } sfx("start"); hideWinner(); });
 $("rmv").textContent = room;
 
 // ----- answer timer (started by the host after a buzz) -----
@@ -138,7 +140,9 @@ const countTo = (el, from, to, dur, pulse) => new Promise(res => {
   requestAnimationFrame(tick);
 });
 let resTok = 0;
+let winOn = false, resBusy = false;
 async function runResult(r) {
+  resBusy = true;
   const tok = ++resTok, live = () => tok === resTok, f = $("flash"), lb = $("lb"), c = r.ok ? "ok" : "no";
   lb.className = "lb"; f.className = "flash"; void f.offsetWidth;
   f.innerHTML = `<b>${r.ok ? "CORRECT!" : "WRONG!"}</b><div class="who"><span class="nm">${tdot(players[r.id])}${esc(r.name)}</span><span class="sc ${c}">${r.from}</span></div>`;
@@ -147,24 +151,46 @@ async function runResult(r) {
   await countTo(f.querySelector(".sc"), r.from, r.to, TIME.scoreCount, true); if (!live()) return;
   await sleep(TIME.resultHold1); if (!live()) return;
 
-  const rows = arr(r.rows), rank = k => [...rows].sort((a, b) => b[k] - a[k] || a.num - b.num).map(x => x.id), r0 = rank("from"), r1 = rank("to");
-  lb.innerHTML = `<h2>Leaderboard</h2><div class="lbl" style="--n:${rows.length}">` + rows.map(x =>
-    `<div class="lbr" data-id="${x.id}" style="transform:translateY(calc(var(--rh) * ${r0.indexOf(x.id)}))"><span class="rk">${r0.indexOf(x.id) + 1}</span><span class="nm">${tdot(players[x.id])}${esc(x.name)}</span><span class="sc">${x.to}</span><span class="ar"></span></div>`).join("") + "</div>";
+  const rows = arr(r.rows), sum = (a, k) => a.reduce((t, x) => t + x[k], 0);
+  const tm = teamsOn ? Object.entries(teams).map(([id, t], i) => { const m = rows.filter(x => players[x.id]?.team === id); return { id: "t" + id, num: i, name: t.name, from: sum(m, "from"), to: sum(m, "to"), dot: `<i class="dot" style="background:${esc(t.color)}"></i>`, team: id }; }) : [];
+  const pl = rows.map(x => ({ ...x, dot: tdot(players[x.id]) }));
+  const lists = tm.length ? [tm, pl] : [pl], total = lists.reduce((t, l) => t + l.length, 0);
+  const ranks = lists.map(l => ["from", "to"].map(k => [...l].sort((a, b) => b[k] - a[k] || a.num - b.num).map(x => x.id)));
+  lb.innerHTML = `<h2>Leaderboard</h2>` + lists.map((l, li) => (tm.length ? `<div class="lbh">${li ? "Players" : "Teams"}</div>` : "") + `<div class="lbl" style="--n:${total};--c:${l.length}">` + l.map(x =>
+    `<div class="lbr" data-id="${x.id}" style="transform:translateY(calc(var(--rh) * ${ranks[li][0].indexOf(x.id)}))"><span class="rk">${ranks[li][0].indexOf(x.id) + 1}</span><span class="nm">${x.dot}${esc(x.name)}</span><span class="sc">${x.to}</span><span class="ar"></span></div>`).join("") + `</div>`).join("");
   lb.className = "lb show"; f.className = "flash out " + c; sfx("swoosh");   // crossfade: leaderboard in while the result fades out
   await sleep(TIME.fade); if (!live()) return;
   f.className = "flash";
   await sleep(Math.max(0, TIME.lbShow - TIME.fade)); if (!live()) return;
   sfx("whoosh");
-  rows.forEach(x => {
-    const el = lb.querySelector(`[data-id="${x.id}"]`), a = r0.indexOf(x.id), b = r1.indexOf(x.id);
+  const mine = players[r.id]?.team;
+  lists.forEach((l, li) => l.forEach(x => {
+    const el = lb.querySelector(`[data-id="${x.id}"]`), a = ranks[li][0].indexOf(x.id), b = ranks[li][1].indexOf(x.id);
     el.style.transform = `translateY(calc(var(--rh) * ${b}))`;
     el.querySelector(".rk").textContent = b + 1;
-    if (x.id === r.id) el.classList.add(c);
+    if (x.id === r.id || (x.team && x.team === mine)) el.classList.add(c);
     if (a !== b) el.querySelector(".ar").innerHTML = `<span class="${b < a ? "up" : "dn"}">${b < a ? "▲" : "▼"} ${Math.abs(a - b)}</span>`;
-  });
+  }));
   await sleep(TIME.lbHold); if (!live()) return;
   lb.className = "lb out"; await sleep(TIME.fade); if (!live()) return;
   lb.className = "lb";
+  resBusy = false; maybeWinner();
+}
+
+const allDone = () => { const keys = (board.categories || []).flatMap((c, i) => arr(c.clues).map((_, r) => i + "-" + r)); return keys.length > 0 && keys.every(k => used[k]); };
+function hideWinner() { winOn = false; $("win").className = "win"; }
+function maybeWinner() {
+  if (winOn || resBusy || clue || !allDone()) return;
+  const rows = Object.entries(players).map(([id, p]) => ({ ...p, id }));
+  if (!rows.length) return;
+  const useTeams = teamsOn && Object.keys(teams).length;
+  const list = useTeams
+    ? Object.entries(teams).map(([id, t]) => ({ name: t.name, dot: `<i class="dot" style="background:${esc(t.color)}"></i>`, score: rows.filter(p => p.team === id).reduce((a, p) => a + p.score, 0) }))
+    : rows.map(p => ({ name: p.name, dot: tdot(p), score: p.score }));
+  const top = Math.max(...list.map(x => x.score)), won = list.filter(x => x.score === top), best = [...rows].sort((a, b) => b.score - a.score)[0];
+  const conf = Array.from({ length: 60 }, () => `<i class="cf" style="left:${(Math.random() * 100).toFixed(1)}%;background:hsl(${Math.floor(Math.random() * 360)},90%,60%);animation-delay:${(Math.random() * 2).toFixed(2)}s;animation-duration:${(2.5 + Math.random() * 2).toFixed(2)}s"></i>`).join("");
+  $("win").innerHTML = conf + `<small>${won.length > 1 ? "IT'S A TIE" : useTeams ? "WINNING TEAM" : "WINNER"}</small><b>${won.map(x => x.dot + esc(x.name)).join(" &amp; ")}</b><span class="ws">${top} pts</span>` + (useTeams ? `<em>Top player: ${tdot(best)}${esc(best.name)} · ${best.score} pts</em>` : "");
+  winOn = true; $("win").className = "win show"; sfx("win");
 }
 
 let counting = false, cdKey = null, cdTok = 0;
