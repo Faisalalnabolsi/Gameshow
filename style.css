@@ -186,3 +186,11 @@ textarea::placeholder{color:#b9b2e6}
 .node+.node::before{width:var(--g)}
 .node.cap{aspect-ratio:auto;height:clamp(44px,6vw,84px);border-radius:999px;padding:0 14px;font-size:clamp(.8rem,1.5vw,1.5rem);line-height:1.15;text-align:center;white-space:pre-line;overflow:hidden}
 .overlay .cl .h1,.overlay .cl .h2{white-space:pre-line}
+/* ladder levels wrap onto new rows; every node keeps its size and stays in a column */
+.ladder.dense{--g:clamp(10px,1.4vw,20px);--nw:clamp(36px,4.2vw,60px)}
+.ladder.dense .node{font-size:clamp(.9rem,1.6vw,1.5rem)}
+.ladder{--nh:clamp(44px,6vw,84px)}
+.rn{grid-template-columns:repeat(auto-fill,var(--nw));column-gap:var(--g);row-gap:clamp(10px,1.6vh,18px);justify-content:center;align-items:center;min-width:0}
+.node{width:var(--nw);height:var(--nw);aspect-ratio:auto;flex:none}
+.node.cap{height:var(--nh)}
+.node+.node::before{display:none}

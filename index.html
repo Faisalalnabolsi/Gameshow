@@ -15,7 +15,7 @@
  <aside class="side card"><h2>Scores</h2><div id="sb"></div></aside>
 </div>
 <script type="module">
-import { db, ref, onValue, room, esc, norm, arr, worth, tierHtml, audioHtml, bindAudio, dot } from "./common.js";
+import { db, ref, onValue, room, esc, norm, arr, worth, tierHtml, audioHtml, bindAudio, dot, namesOn } from "./common.js";
 
 // ===== TIMINGS (milliseconds): edit these numbers to tune the animations =====
 const TIME = {
@@ -231,7 +231,7 @@ function render() {
   else {
     const w = buzz.winner && players[buzz.winner], t = clue.type === "tier";
     if (clue.key !== cdKey) { cdKey = clue.key; counting = true; runCount(); }
-    const lvl = Number(clue.key.split("-")[1]) + 1, lnm = board.levelNames && board.categories[clue.key.split("-")[0]]?.clues[clue.key.split("-")[1]]?.name;
+    const lvl = Number(clue.key.split("-")[1]) + 1, lnm = namesOn(board) && board.categories[clue.key.split("-")[0]]?.clues[clue.key.split("-")[1]]?.name;
     const sec = t ? `${lnm || "Level " + lvl} · +${worth(clue, board.decay)} / −${clue.penalty ?? clue.value}` + (counting ? "" : ` · clue ${clue.shown}/${clue.total}`) : `${clue.value}`;
     $("oc").innerHTML = `<div class="h1">${esc(clue.cat)}</div><div class="h2">${esc(sec)}</div>`;
     $("oq").textContent = clue.question || "";

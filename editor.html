@@ -71,7 +71,7 @@ const levelHtml = (q, i, j) => {
 function draw() {
   $("ed").hidden = !cur; if (!cur) return;
   const T = cur.type === "tier";
-  $("bn").value = cur.name; $("dcw").hidden = !T; $("aaw").hidden = !T; $("lnw").hidden = !T; $("ln").checked = !!cur.levelNames; $("aa").checked = !!cur.allAtOnce; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
+  $("bn").value = cur.name; $("dcw").hidden = !T; $("aaw").hidden = !T; $("lnw").hidden = !T; $("ln").checked = cur.levelNames ?? cur.categories.some(c => c.clues.some(q => q.name)); $("aa").checked = !!cur.allAtOnce; $("dc").value = cur.decay ?? 10; $("addcat").textContent = T ? "+ Add tier" : "+ Add category";
   $("cats").innerHTML = cur.categories.map((c, i) => `<div class="card" data-dl="c" data-di="${i}"><div class="row">${HD}${TG("c" + i)}${T ? `<textarea class="grow" data-c="${i}" data-f="name" rows="2" placeholder="Tier name (Enter = new line)">${esc(c.name)}</textarea>` : `<input class="grow" data-c="${i}" data-f="name" value="${esc(c.name)}" placeholder="Category name">`}${T ? `<label class="small">+</label><input type="number" data-c="${i}" data-f="points" value="${c.points ?? 100}" style="width:90px" title="Points for a correct answer"><label class="small">−</label><input type="number" data-c="${i}" data-f="penalty" value="${c.penalty ?? c.points ?? 100}" style="width:90px" title="Points lost for a wrong answer">` : ""}<button class="bad" data-x="c${i}">Remove</button></div>`
     + (fold("c" + i) ? "</div>" : c.clues.map((q, j) => T ? levelHtml(q, i, j) : jeoHtml(q, i, j)).join("")
     + `<button data-x="a${i}">+ Add ${T ? "level" : "clue"}</button></div>`)).join("");

@@ -52,14 +52,15 @@ onValue(R("boardId"), s => { boardId = s.val(); fillBoards(); useBoard(); });
 onAuthStateChanged(auth, u => {
   $("login").hidden = !!u; $("app").hidden = !u;
   if (u) syncRoom();
-  if (u) onValue(ref(db, "library/boards"), s => { lib = s.val() || {}; fillBoards(); useBoard(); });
+  if (u) onValue(ref(db, "library/boards"), s => { lib = s.val() || {}; fillBoards(); useBoard(); if (boardId && lib[boardId]) pubBoard(norm(lib[boardId])); });
 });
 $("signin").onclick = () => signInWithEmailAndPassword(auth, $("em").value, $("pw").value).catch(e => $("lerr").textContent = "Sign-in failed: " + e.code);
+const pubBoard = b => set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, levelNames: b.levelNames ?? null, categories: b.categories.map(c => ({ name: c.name, points: c.points ?? null, penalty: c.penalty ?? c.points ?? null, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "", name: q.name ?? "" })) })) });
 $("load").onclick = async () => {
   const id = $("boards").value; if (!id) return;
   if (Object.keys(used).length && !confirm("Loading a board resets the tiles. Continue?")) return;
   const b = norm(lib[id]);
-  await set(R("board"), { name: b.name, type: b.type || "jeopardy", decay: b.decay ?? 10, levelNames: !!b.levelNames, categories: b.categories.map(c => ({ name: c.name, points: c.points ?? null, penalty: c.penalty ?? c.points ?? null, clues: c.clues.map(q => ({ value: q.value ?? c.points ?? 0, question: q.question ?? "", name: q.name ?? "" })) })) });
+  await pubBoard(b);
   set(R("boardId"), id); set(R("start"), Date.now()); set(R("used"), null); set(R("clue"), null); set(R("buzz"), { open: false });
 };
 onValue(R("players"), s => { players = s.val() || {}; render(); });
