@@ -194,3 +194,11 @@ textarea::placeholder{color:#b9b2e6}
 .node{width:var(--nw);height:var(--nw);aspect-ratio:auto;flex:none}
 .node.cap{height:var(--nh)}
 .node+.node::before{display:none}
+.gp{color:#4ade80;font-style:normal}
+.rp{color:#f87171;font-style:normal}
+#val{color:#4ade80}
+#pen{color:#f87171}
+/* named levels: a circle when the name is short, a horizontal rounded rectangle that grows with long names */
+.ladder.caps .rn{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:clamp(10px,1.6vh,18px) var(--g)}
+.ladder.caps .node.cap{width:auto;min-width:var(--nh);height:auto;min-height:var(--nh);max-width:100%;padding:6px clamp(14px,1.6vw,26px);border-radius:999px;font-size:clamp(.9rem,1.7vw,1.7rem);white-space:pre-line;text-align:center;overflow:visible}
+.ladder.caps .node.used{text-decoration:line-through}
